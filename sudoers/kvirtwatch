@@ -1,0 +1,12 @@
+# ==============================================================================
+# File: /etc/sudoers.d/kvirtwatch (Da posizionare sui 5 nodi KVM SLES)
+# Descrizione: Configurazione dei privilegi minimi per l'utente kvirtwatch.
+#              Consente il monitoraggio e l'interazione con Pacemaker senza password.
+# Autore: Linux Engineer Senior
+# Progetto: KvirtIO Virtualization
+# ==============================================================================
+
+# Nota: per sicurezza i comandi crm_attribute sono bloccati ai soli parametri richiesti.
+kvirtwatch ALL=(ALL) NOPASSWD: /usr/sbin/crm_attribute --node node[1-5] --name status-load --update overloaded, \
+                               /usr/sbin/crm_attribute --node node[1-5] --name status-load --update healthy, \
+                               /usr/bin/iostat -dx 1 2
