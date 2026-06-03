@@ -25,6 +25,7 @@ Questi script risiedono sul server di management esterno ed interrogano i nodi K
 ### 3. Configurazioni Systemd (Timer)
 *   ⚙️ **[kvirtio-host-watcher.service](systemd/kvirtio-host-watcher.service)** / **[Timer](systemd/kvirtio-host-watcher.timer)** (Esecuzione ogni 5 minuti).
 *   ⚙️ **[kvirtio-io-watcher.service](systemd/kvirtio-io-watcher.service)** / **[Timer](systemd/kvirtio-io-watcher.timer)** (Esecuzione ogni minuto).
+*   ⚙️ **[kvirtio-html-generator.service](systemd/kvirtio-html-generator.service)** / **[Timer](systemd/kvirtio-html-generator.timer)** (Esecuzione ogni 5 minuti).
 
 ### 4. Configurazione di Sicurezza (Nodi Compute)
 *   🛡️ **[kvirtwatch (Sudoers)](sudoers/kvirtwatch)**: Privilegi sudo minimi necessari da configurare sui nodi KVM per `crm_attribute` e `iostat`.
@@ -33,5 +34,7 @@ Questi script risiedono sul server di management esterno ed interrogano i nodi K
 *   📘 **[Guida al Deployment dei Watcher](docs/deployment.md)**: Istruzioni passo-passo per l'installazione di SSH, script, timers e permessi sudo.
 *   📘 **[Dettaglio Host Watcher Service](docs/kvirtio-host-watcher-service.md)**: Analisi dell'algoritmo di calcolo CPU/RAM e delle transizioni di stato.
 *   📘 **[Dettaglio I/O Watcher Service](docs/kvirtio-io-watcher-service.md)**: Analisi delle metriche `await` estratte tramite `iostat`.
+*   📘 **[Dettaglio HTML Generator Service](docs/kvirtio-html-genrator-service.md)**: Pagina di monitoraggio dello stato dell'infrastruttura.
+*   📘 **[Dettaglio Alerter](docs/kvirtio-mail-alerter.md)**: Dettaglio sistema di alerting tramite mail.
 
 
