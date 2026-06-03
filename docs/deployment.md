@@ -47,7 +47,7 @@ Il monitoraggio adotta un design completamente disaccoppiato basato su file di c
 Su ciascun nodo ipervisore di tutti i cluster gestiti:
 
 1.  Creare il file di configurazione sudoers per permettere l'elevazione dei privilegi controllata dell'utente `kvirtwatch`:
-    *   Copiare il contenuto del file logico di configurazione [kvirtwatch (sudoers)](file:///c:/Users/tafurok/OneDrive%20-%20Applied%20Innovation%20Makers/Desktop/personale/kVirtio/sudoers/kvirtwatch) in `/etc/sudoers.d/kvirtwatch`.
+    *   Copiare il contenuto del file logico di configurazione [kvirtwatch (sudoers)](../sudoers/kvirtwatch) in `/etc/sudoers.d/kvirtwatch`.
 2.  Impostare i permessi di sicurezza corretti:
     ```bash
     sudo chmod 0440 /etc/sudoers.d/kvirtwatch
@@ -71,8 +71,8 @@ Sul Server di Management esterno:
 
 2.  **Posizionamento dei file di configurazione**:
     *   Creare i file di configurazione per ciascun cluster in `/etc/kvirtio/clusters/` prendendo spunto dai seguenti modelli:
-        *   [etc/kvirtio/clusters/cluster_db.conf](file:///c:/Users/tafurok/OneDrive%20-%20Applied%20Innovation%20Makers/Desktop/personale/kVirtio/etc/kvirtio/clusters/cluster_db.conf): Configurazione per il cluster database con soglie prestazionali restrittive.
-        *   [etc/kvirtio/clusters/cluster_web.conf](file:///c:/Users/tafurok/OneDrive%20-%20Applied%20Innovation%20Makers/Desktop/personale/kVirtio/etc/kvirtio/clusters/cluster_web.conf): Configurazione per il cluster generico/web.
+        *   [etc/kvirtio/clusters/cluster_db.conf](../etc/kvirtio/clusters/cluster_db.conf): Configurazione per il cluster database con soglie prestazionali restrittive.
+        *   [etc/kvirtio/clusters/cluster_web.conf](../etc/kvirtio/clusters/cluster_web.conf): Configurazione per il cluster generico/web.
     *   Assegnare la proprietà all'utente di gestione:
         ```bash
         sudo chown -R kvirtwatch:kvirtwatch /etc/kvirtio
@@ -81,8 +81,8 @@ Sul Server di Management esterno:
         ```
 
 3.  **Posizionamento degli script**:
-    *   Copiare lo script [kvirtio-host-watcher.sh](file:///c:/Users/tafurok/OneDrive%20-%20Applied%20Innovation%20Makers/Desktop/personale/kVirtio/scripts/kvirtio-host-watcher.sh) in `/usr/local/bin/kvirtio-host-watcher.sh`.
-    *   Copiare lo script [kvirtio-io-watcher.sh](file:///c:/Users/tafurok/OneDrive%20-%20Applied%20Innovation%20Makers/Desktop/personale/kVirtio/scripts/kvirtio-io-watcher.sh) in `/usr/local/bin/kvirtio-io-watcher.sh`.
+    *   Copiare lo script [kvirtio-host-watcher.sh](../scripts/kvirtio-host-watcher.sh) in `/usr/local/bin/kvirtio-host-watcher.sh`.
+    *   Copiare lo script [kvirtio-io-watcher.sh](../scripts/kvirtio-io-watcher.sh) in `/usr/local/bin/kvirtio-io-watcher.sh`.
     *   Assegnare i permessi di esecuzione:
         ```bash
         sudo chmod +x /usr/local/bin/kvirtio-host-watcher.sh
@@ -92,7 +92,7 @@ Sul Server di Management esterno:
         ```
 
 4.  **Configurazione dei Servizi Systemd**:
-    *   Copiare i file di servizio e timer da [systemd/](file:///c:/Users/tafurok/OneDrive%20-%20Applied%20Innovation%20Makers/Desktop/personale/kVirtio/systemd/) in `/etc/systemd/system/`:
+    *   Copiare i file di servizio e timer da [systemd/](../systemd/) in `/etc/systemd/system/`:
         ```bash
         sudo cp systemd/kvirtio-*.service /etc/systemd/system/
         sudo cp systemd/kvirtio-*.timer /etc/systemd/system/
@@ -131,7 +131,7 @@ sudo systemctl start kvirtio-io-watcher.service
 
 ### Ispezione Log Multi-Cluster
 I log in syslog riporteranno l'indicazione esplicita del cluster in fase di elaborazione (es. `[cluster_db]`, `[cluster_web]`):
-*   Per visualizzare l'output del watcher host:
+*   Pour visualizzare l'output del watcher host:
     ```bash
     journalctl -t KvirtIO-Host -f
     ```
