@@ -131,7 +131,7 @@ sudo systemctl start kvirtio-io-watcher.service
 
 ### Ispezione Log Multi-Cluster
 I log in syslog riporteranno l'indicazione esplicita del cluster in fase di elaborazione (es. `[cluster_db]`, `[cluster_web]`):
-*   Pour visualizzare l'output del watcher host:
+*   Per visualizzare l'output del watcher host:
     ```bash
     journalctl -t KvirtIO-Host -f
     ```
@@ -143,3 +143,84 @@ I log in syslog riporteranno l'indicazione esplicita del cluster in fase di elab
     ```bash
     journalctl -t KvirtIO-Host | grep '\[cluster_db\]'
     ```
+
+## 📜 Step 4: Logging e Centralizzazione Log dei (KVM, Pacemaker, Audit)
+
+Gestione del logging verso il cluster di watcher. 
+
+Per rispettare la naming convention richiesta (`[servizio]-[cluster]-[nodo].log`), la configurazione sul server ricevente viene generata dinamicamente leggendo i file del progetto in `/etc/kvirtio/clusters/*.conf`, in modo da mappare correttamente ogni nodo al proprio cluster di appartenenza.
+
+---
+
+### 1. Configurazione sui Nodi KVM (Client)
+
+Sui nodi computazionali, `rsyslog` viene istruito per inoltrare i flussi specifici al Virtual IP (o IP dedicato) del server Watcher, mentre `auditd` viene configurato per inviare i propri eventi a syslog.
+
+#### 1.1 Forwarding Rsyslog (`/etc/rsyslog.d/10-kvirtio-forward.conf`)
+Creare il file su ogni nodo KVM per inoltrare i servizi target:
+
+
+#### 1.2 Inoltro log di Pacemaker / Cluster Manager
+ ```bash
+if $programname == ['pacemakerd','crmd','pengine','corosync'] then @[IP_SERVER_WATCHER]:514
+t = string
+ ```
+
+#### 1.3 Inoltro log di KVM / QEMU / Libvirt
+ ```bash
+if $programname == ['libvirtd','qemu','qemu-kvm','qemu-system-x86_64'] then @[IP_SERVER_WATCHER]:514
+t = string
+ ```
+
+#### 1.4 Inoltro log di Auditd
+ ```bash
+if $programname == ['audisp-syslog','auditd'] then @[IP_SERVER_WATCHER]:514
+t = string
+```
+
+#### 1.5  Configurazione di auditd sui nodi
+*   Modificare la configurazione del plugin di audit (il percorso standard per SLES è /etc/audisp/plugins.d/syslog.conf o /etc/audit/plugins.d/syslog.conf a seconda della release):
+    ```bash
+    active = yes
+    direction = out
+    path = /sbin/audisp-syslog
+    type = always
+    args = LOG_WARNING
+    format = string
+    ```
+
+#### 1.6 Restart dei servizi sui nodi
+ ```bash
+systemctl restart auditd rsyslog
+```
+
+
+### 2. Configurazione sul Cluster Watcher
+
+* Poiché rsyslog non è nativamente a conoscenza della variabile "Cluster" ma riceve solo l'hostname, utilizziamo uno script generatore che legge la topologia di kVirtIO (/etc/kvirtio/clusters/*.conf) e costruisce le regole di routing esatte per ogni nodo.
+
+### 2.1 Preparazione delle directory
+* per ogni nodo di Watcher generare i seguenti comandi:
+```bash
+mkdir -p /var/log/kvirtio/
+chown syslog:kvirtwatch /var/log/kvirtio/
+chmod 755 /var/log/kvirtio/
+```
+
+### 2.2 Script Generatore Configurazione Rsyslog
+* Creare lo script /usr/local/bin/kvirtio-rsyslog-generator.sh sul server Watcher. Questo script mapperà ogni nodo per salvare i log secondo il formato: /var/log/kvirtio/[servizio]-[cluster]-[nodo].log.
+
+📜 **[kvirtio-rsyslog-generator.sh](../scripts/kvirtio-rsyslog-generator.sh)**:
+
+### 2.3 Esecuzione e Riavvio
+* Rendere eseguibile lo script e generare la configurazione di rsyslog:
+
+```bash
+chmod +x /usr/local/bin/kvirtio-rsyslog-generator.sh
+/usr/local/bin/kvirtio-rsyslog-generator.sh
+```
+*Verificare che il file /etc/rsyslog.d/30-kvirtio-receiver.conf sia stato popolato correttamente e riavviare il demone sul Watcher:
+```bash
+systemctl restart rsyslog
+```
+** (Nota Operativa: Ogni volta che un nuovo nodo o un nuovo cluster viene aggiunto in /etc/kvirtio/clusters/*.conf, basterà lanciare nuovamente /usr/local/bin/kvirtio-rsyslog-generator.sh e ricaricare rsyslog).
