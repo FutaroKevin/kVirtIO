@@ -39,8 +39,8 @@ graph TD
     %% Network Connections
     MGT_SRV --> NET_MGMT
     MON_SRV --> NET_MGMT
-    N1 & N2 & N3 & N4 & N5 --> NET_MGMT
-    N1 & N2 & N3 & N4 & N5 --> NET_PROD_LM
+    N1 & N2 & N3 & N4 & N5 -- 25/10Gbe Port  --> NET_MGMT
+    N1 & N2 & N3 & N4 & N5 -- 25/10Gbe --> NET_PROD_LM
 
     %% Storage Connections
     N1 & N2 & N3 & N4 & N5 -- FC HBA Dual Port --> SAN_SWITCH
