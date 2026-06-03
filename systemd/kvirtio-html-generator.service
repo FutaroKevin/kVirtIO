@@ -1,0 +1,16 @@
+[Unit]
+Description=KvirtIO HTML Dashboard Generator
+After=network.target
+
+[Service]
+Type=oneshot
+User=kvirtwatch
+ExecStart=/usr/local/bin/kvirtio-html-generator.py
+# Hardening del processo locale
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/var/www/html/kvirtio
+
+[Install]
+WantedBy=multi-user.target
