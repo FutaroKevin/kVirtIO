@@ -34,5 +34,4 @@ Questi script risiedono sul server di management esterno ed interrogano i nodi K
 *   📘 **[Dettaglio Host Watcher Service](docs/kvirtio-host-watcher-service.md)**: Analisi dell'algoritmo di calcolo CPU/RAM e delle transizioni di stato.
 *   📘 **[Dettaglio I/O Watcher Service](docs/kvirtio-io-watcher-service.md)**: Analisi delle metriche `await` estratte tramite `iostat`.
 
----
-*KvirtIO - Progettato per Service Provider Enterprise.*
+
