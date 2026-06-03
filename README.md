@@ -21,6 +21,10 @@
 Questi script risiedono sul server di management esterno ed interrogano i nodi KVM tramite l'utente `kvirtwatch` via SSH.
 *   📜 **[kvirtio-host-watcher.sh](scripts/kvirtio-host-watcher.sh)**: Script di monitoraggio di carico CPU/RAM con integrazione `crm_attribute`.
 *   📜 **[kvirtio-io-watcher.sh](scripts/kvirtio-io-watcher.sh)**: Script per l'analisi della latenza `await` sui dischi multipath.
+*   📜 **[kvirtio-vm-migrate.sh](scripts/kvirtio-vm-migrate.sh)**: Script per l'esecuzione della Live Migration a caldo di una VM da un nodo sorgente a un nodo di destinazione.
+*   📜 **[kvirtio-vm-create.sh](scripts/kvirtio-vm-create.sh)**: Script per la creazione della VM partendo dal cluster di management. 
+*   📜 **[kvirtio-html-generator.py](scripts/kvirtio-html-generator.py)**: Script per il monitoraggio dell'infrastruttura tramite pagina web
+
 
 ### 3. Configurazioni Systemd (Timer)
 *   ⚙️ **[kvirtio-host-watcher.service](systemd/kvirtio-host-watcher.service)** / **[Timer](systemd/kvirtio-host-watcher.timer)** (Esecuzione ogni 5 minuti).
@@ -34,7 +38,7 @@ Questi script risiedono sul server di management esterno ed interrogano i nodi K
 *   📘 **[Guida al Deployment dei Watcher](docs/deployment.md)**: Istruzioni passo-passo per l'installazione di SSH, script, timers e permessi sudo.
 *   📘 **[Dettaglio Host Watcher Service](docs/kvirtio-host-watcher-service.md)**: Analisi dell'algoritmo di calcolo CPU/RAM e delle transizioni di stato.
 *   📘 **[Dettaglio I/O Watcher Service](docs/kvirtio-io-watcher-service.md)**: Analisi delle metriche `await` estratte tramite `iostat`.
-*   📘 **[Dettaglio HTML Generator Service](docs/kvirtio-html-genrator-service.md)**: Pagina di monitoraggio dello stato dell'infrastruttura.
+*   📘 **[Dettaglio HTML Generator Service](docs/kvirtio-html-generator-service.md)**: Pagina di monitoraggio dello stato dell'infrastruttura.
 *   📘 **[Dettaglio Alerter](docs/kvirtio-mail-alerter.md)**: Dettaglio sistema di alerting tramite mail.
 
 
