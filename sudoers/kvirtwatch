@@ -2,7 +2,7 @@
 # File: /etc/sudoers.d/kvirtwatch (Da posizionare sui 5 nodi KVM SLES)
 # Descrizione: Configurazione dei privilegi minimi per l'utente kvirtwatch.
 #              Consente il monitoraggio e l'interazione con Pacemaker senza password.
-# Autore: Linux Engineer Senior
+# Autore: Kevin Tafuro
 # Progetto: KvirtIO Virtualization
 # ==============================================================================
 
