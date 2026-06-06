@@ -1,0 +1,10 @@
+[Unit]
+Description=Run KvirtIO Cluster Watcher every 2 minutes
+
+[Timer]
+OnCalendar=*:0/2
+Persistent=true
+Unit=kvirtio-cluster-watcher.service
+
+[Install]
+WantedBy=timers.target

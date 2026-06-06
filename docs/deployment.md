@@ -210,17 +210,17 @@ chmod 755 /var/log/kvirtio/
 ### 2.2 Script Generatore Configurazione Rsyslog
 * Creare lo script /usr/local/bin/kvirtio-rsyslog-generator.sh sul server Watcher. Questo script mapperà ogni nodo per salvare i log secondo il formato: /var/log/kvirtio/[servizio]-[cluster]-[nodo].log.
 
-📜 **[kvirtio-rsyslog-generator.sh](../scripts/kvirtio-rsyslog-generator.sh)**:
+📜 **[kvirtio-setup-rsyslog-generator.sh](../scripts/kvirtio-rsyslog-generator.sh)**:
 
 ### 2.3 Esecuzione e Riavvio
 * Rendere eseguibile lo script e generare la configurazione di rsyslog:
 
 ```bash
-chmod +x /usr/local/bin/kvirtio-rsyslog-generator.sh
+chmod +x /usr/local/bin/kvirtio-setup-rsyslog-generator.sh
 /usr/local/bin/kvirtio-rsyslog-generator.sh
 ```
 *Verificare che il file /etc/rsyslog.d/30-kvirtio-receiver.conf sia stato popolato correttamente e riavviare il demone sul Watcher:
 ```bash
 systemctl restart rsyslog
 ```
-** (Nota Operativa: Ogni volta che un nuovo nodo o un nuovo cluster viene aggiunto in /etc/kvirtio/clusters/*.conf, basterà lanciare nuovamente /usr/local/bin/kvirtio-rsyslog-generator.sh e ricaricare rsyslog).
+** (Nota Operativa: Ogni volta che un nuovo nodo o un nuovo cluster viene aggiunto in /etc/kvirtio/clusters/*.conf, basterà lanciare nuovamente /usr/local/bin/kvirtio-setup-rsyslog-generator.sh e ricaricare rsyslog).
