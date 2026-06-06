@@ -19,9 +19,10 @@ import re
 import subprocess
 import syslog
 from datetime import datetime, timezone, timedelta
+from time import sleep
 
 # ---- Costanti ----------------------------------------------------------------
-OUTPUT_DIR  = "/var/lib/kvirtio/logs"
+OUTPUT_DIR  = "/var/log/kvirtio/logs"
 OUTPUT_FILE = os.path.join(OUTPUT_DIR, "kvirtio-events.json")
 LOG_TAG     = "KvirtIO-LogCollector"
 
@@ -244,30 +245,32 @@ def write_output(events: list[dict]) -> bool:
 def main() -> None:
     log_info("Avvio raccolta log.")
 
-    if not ensure_output_dir():
-        return
+    while 1:
+        if not ensure_output_dir():
+            return
 
-    # Raccolta nuovi eventi dal journal
-    new_events = collect_journal_events()
-    log_info(f"Raccolti {len(new_events)} nuovi eventi dal journal.")
+        # Raccolta nuovi eventi dal journal
+        new_events = collect_journal_events()
+        log_info(f"Raccolti {len(new_events)} nuovi eventi dal journal.")
 
-    # Carica eventi esistenti
-    existing_events = load_existing_events()
+        # Carica eventi esistenti
+        existing_events = load_existing_events()
 
-    # Retention: rimuovi eventi troppo vecchi
-    existing_events = filter_events_by_retention(existing_events)
+        # Retention: rimuovi eventi troppo vecchi
+        existing_events = filter_events_by_retention(existing_events)
 
-    # Merge e deduplicazione
-    all_events = deduplicate_events(existing_events, new_events)
+        # Merge e deduplicazione
+        all_events = deduplicate_events(existing_events, new_events)
 
-    # Scrittura output
-    if write_output(all_events):
-        log_info(
-            f"File eventi aggiornato: {len(all_events)} eventi totali "
-            f"in {OUTPUT_FILE}."
-        )
-    else:
-        log_error("Scrittura file eventi fallita.")
+        # Scrittura output
+        if write_output(all_events):
+            log_info(
+                f"File eventi aggiornato: {len(all_events)} eventi totali "
+                f"in {OUTPUT_FILE}."
+            )
+        else:
+            log_error("Scrittura file eventi fallita.")
+        time.sleep(5000) #harcodato 5 secondi di sleep prima di ricominciare il cliclo di lettura log
 
 
 if __name__ == "__main__":

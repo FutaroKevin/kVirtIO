@@ -1,0 +1,16 @@
+[Unit]
+Description=KvirtIO Log collector Service
+After=network.target
+
+[Service]
+Type=oneshot
+User=kvirtwatch
+ExecStart=python3 /usr/local/bin/kvirtio-log-collector.py
+# Hardening del processo locale
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/tmp
+
+[Install]
+WantedBy=multi-user.target
