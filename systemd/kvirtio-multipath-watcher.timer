@@ -1,0 +1,10 @@
+[Unit]
+Description=Run KvirtIO Multipath Watcher every 1 minute
+
+[Timer]
+OnCalendar=*:0/1
+Persistent=true
+Unit=kvirtio-multipath-watcher.service
+
+[Install]
+WantedBy=timers.target
