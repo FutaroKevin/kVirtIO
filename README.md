@@ -1,44 +1,42 @@
 # KvirtIO: Enterprise Virtualization Platform
 
-**KvirtIO** è un'architettura di virtualizzazione enterprise di classe Service Provider concepita per scenari ad elevata densità di I/O e alta affidabilità (HA), basata interamente su tecnologie native e open-source distribuite da **SUSE Linux Enterprise Server (SLES)**.
+**KvirtIO** is an enterprise, Service Provider-class virtualization architecture designed for high I/O density and High Availability (HA) scenarios. It is based entirely on native and open-source technologies running on **SUSE Linux Enterprise Server (SLES)**. We do not intend **KvirtIO** to be a native hypervisor, but rather, as previously mentioned, an architecture composed of open-source solutions.
+
+This project is not intended to be associated to virtIO library
+---
+
+## 🚀 Project Goals
+* **Deterministic Performance**: Total exclusion of host swap and optimization of RAM allocation (Hugepages) and CPU (NUMA pinning).
+* **I/O Optimized for Databases ("IOIntensive")**: Parallelization of kernel SCSI queues (`lun_queue_depth`) through Multi-LUN Striped strategies and `blk-mq` architecture.
+* **High Availability and Multilevel Fencing**: Tight integration among Pacemaker, Corosync, Cluster LVM (`lvmlockd` + `dlm`), and physical STONITH mechanisms (`fence_idrac`) as well as storage-based ones (`sbd` on Witness LUN with hardware watchdog).
+* **Control Plane Decoupling**: Isolation of monitoring, telemetry, and load balancing logic outside the production KVM cluster.
 
 ---
 
-## 🚀 Obiettivi del Progetto
-*   **Prestazioni deterministiche**: Esclusione totale dello swap host e ottimizzazione dell'allocazione di RAM (Hugepages) e CPU (pinning NUMA).
-*   **I/O ottimizzato per Database ("IOIntensive")**: Parallelizzazione delle code SCSI del kernel (`lun_queue_depth`) tramite strategie Multi-LUN Striped e architettura `blk-mq`.
-*   **Alta Affidabilità e Fencing multilivello**: Integrazione stretta tra Pacemaker, Corosync, Cluster LVM (`lvmlockd` + `dlm`) e meccanismi STONITH fisici (`fence_idrac`) e storage-based (`sbd` su Witness LUN con watchdog hardware).
-*   **Disaccoppiamento del Control Plane**: Isolamento delle logiche di monitoraggio, telemetria e bilanciamento dei carichi all'esterno del cluster KVM di produzione.
+## 📂 Repository Structure
 
----
+### 1. Architecture and Design Documents
+* 📄 **[KvirtIO High-Level Design (HLD)](KvirtIO_HLD.md)**: The high-level architecture document.
 
-## 📂 Struttura del Repository
+### 2. Monitoring & Watcher (External Control Plane)
+These scripts reside on the external management server and query the KVM nodes via SSH using the `kvirtwatch` user.
+* 📜 **[kvirtio-host-watcher.sh](scripts/kvirtio-host-watcher.sh)**: CPU/RAM load monitoring script with `crm_attribute` integration.
+* 📜 **[kvirtio-io-watcher.sh](scripts/kvirtio-io-watcher.sh)**: Script for analyzing `await` latency on multipath disks.
+* 📜 **[kvirtio-vm-migrate.sh](scripts/kvirtio-vm-migrate.sh)**: Script for executing a hot Live Migration of a VM from a source node to a destination node.
+* 📜 **[kvirtio-vm-create.sh](scripts/kvirtio-vm-create.sh)**: Script for creating a VM from the management cluster.
+* 📜 **[kvirtio-html-generator.py](scripts/kvirtio-html-generator.py)**: Script for infrastructure monitoring via a web page.
 
-### 1. Documenti di Architettura e Design
-*   📄 **[KvirtIO High-Level Design (HLD)](KvirtIO_HLD.md)**: Il documento di architettura di alto livello.
+### 3. Systemd Configurations (Timers)
+* ⚙️ **[kvirtio-host-watcher.service](systemd/kvirtio-host-watcher.service)** / **[Timer](systemd/kvirtio-host-watcher.timer)** (Execution every 5 minutes).
+* ⚙️ **[kvirtio-io-watcher.service](systemd/kvirtio-io-watcher.service)** / **[Timer](systemd/kvirtio-io-watcher.timer)** (Execution every minute).
+* ⚙️ **[kvirtio-html-generator.service](systemd/kvirtio-html-generator.service)** / **[Timer](systemd/kvirtio-html-generator.timer)** (Execution every 5 minutes).
 
-### 2. Monitoraggio & Watcher (Control Plane Esterno)
-Questi script risiedono sul server di management esterno ed interrogano i nodi KVM tramite l'utente `kvirtwatch` via SSH.
-*   📜 **[kvirtio-host-watcher.sh](scripts/kvirtio-host-watcher.sh)**: Script di monitoraggio di carico CPU/RAM con integrazione `crm_attribute`.
-*   📜 **[kvirtio-io-watcher.sh](scripts/kvirtio-io-watcher.sh)**: Script per l'analisi della latenza `await` sui dischi multipath.
-*   📜 **[kvirtio-vm-migrate.sh](scripts/kvirtio-vm-migrate.sh)**: Script per l'esecuzione della Live Migration a caldo di una VM da un nodo sorgente a un nodo di destinazione.
-*   📜 **[kvirtio-vm-create.sh](scripts/kvirtio-vm-create.sh)**: Script per la creazione della VM partendo dal cluster di management. 
-*   📜 **[kvirtio-html-generator.py](scripts/kvirtio-html-generator.py)**: Script per il monitoraggio dell'infrastruttura tramite pagina web
+### 4. Security Configuration (Compute Nodes)
+* 🛡️ **[kvirtwatch (Sudoers)](sudoers/kvirtwatch)**: Minimum required sudo privileges to be configured on KVM nodes for `crm_attribute` and `iostat`.
 
-
-### 3. Configurazioni Systemd (Timer)
-*   ⚙️ **[kvirtio-host-watcher.service](systemd/kvirtio-host-watcher.service)** / **[Timer](systemd/kvirtio-host-watcher.timer)** (Esecuzione ogni 5 minuti).
-*   ⚙️ **[kvirtio-io-watcher.service](systemd/kvirtio-io-watcher.service)** / **[Timer](systemd/kvirtio-io-watcher.timer)** (Esecuzione ogni minuto).
-*   ⚙️ **[kvirtio-html-generator.service](systemd/kvirtio-html-generator.service)** / **[Timer](systemd/kvirtio-html-generator.timer)** (Esecuzione ogni 5 minuti).
-
-### 4. Configurazione di Sicurezza (Nodi Compute)
-*   🛡️ **[kvirtwatch (Sudoers)](sudoers/kvirtwatch)**: Privilegi sudo minimi necessari da configurare sui nodi KVM per `crm_attribute` e `iostat`.
-
-### 5. Guide ed Istruzioni Operative
-*   📘 **[Guida al Deployment dei Watcher](docs/deployment.md)**: Istruzioni passo-passo per l'installazione di SSH, script, timers e permessi sudo.
-*   📘 **[Dettaglio Host Watcher Service](docs/kvirtio-host-watcher-service.md)**: Analisi dell'algoritmo di calcolo CPU/RAM e delle transizioni di stato.
-*   📘 **[Dettaglio I/O Watcher Service](docs/kvirtio-io-watcher-service.md)**: Analisi delle metriche `await` estratte tramite `iostat`.
-*   📘 **[Dettaglio HTML Generator Service](docs/kvirtio-html-generator-service.md)**: Pagina di monitoraggio dello stato dell'infrastruttura.
-*   📘 **[Dettaglio Alerter](docs/kvirtio-mail-alerter.md)**: Dettaglio sistema di alerting tramite mail.
-
-
+### 5. Guides and Operational Instructions
+* 📘 **[Watcher Deployment Guide](docs/deployment.md)**: Step-by-step instructions for installing SSH, scripts, timers, and sudo permissions.
+* 📘 **[Host Watcher Service Detail](docs/kvirtio-host-watcher-service.md)**: Analysis of the CPU/RAM calculation algorithm and state transitions.
+* 📘 **[I/O Watcher Service Detail](docs/kvirtio-io-watcher-service.md)**: Analysis of the `await` metrics extracted via `iostat`.
+* 📘 **[HTML Generator Service Detail](docs/kvirtio-html-generator-service.md)**: Infrastructure status monitoring page.
+* 📘 **[Alerter Detail](docs/kvirtio-mail-alerter.md)**: Detail of the email alerting system.

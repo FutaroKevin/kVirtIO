@@ -3,31 +3,31 @@
 
 ---
 
-## 1. Executive Summary & Obiettivi del Progetto
+## 1. Executive Summary & Project Objectives
 
-### 1.1 Introduzione e Visione
-Il progetto **KvirtIO** definisce l'architettura di una piattaforma di virtualizzazione di classe Enterprise concepita per scenari ad elevatissima densità di I/O e alta affidabilità (HA), destinata a ospitare carichi di lavoro mission-critical (es. Database transazionali, ERP ad alto throughput, sistemi di messaggistica ad alta frequenza). 
+### 1.1 Vision and Introduction
+The **KvirtIO** project defines the architecture of an Enterprise-class virtualization platform designed for extremely high I/O density and high availability (HA) scenarios, intended to host mission-critical workloads (e.g. transactional databases, high-throughput ERP systems, high-frequency messaging systems).
 
-A differenza delle soluzioni di virtualizzazione commerciali tradizionali, KvirtIO adotta uno stack tecnologico interamente basato su componenti nativi e open-source di livello enterprise distribuiti da **SUSE Linux Enterprise Server (SLES) 15 SP5/SP6**, garantendo il controllo completo sul piano dati (data plane) e sul piano di controllo (control plane), l'assenza di vendor lock-in e prestazioni vicino al bare-metal grazie a una rigorosa ottimizzazione hardware-software.
+Unlike traditional commercial virtualization solutions, KvirtIO adopts a technology stack built entirely on native, enterprise-grade open-source components using **SUSE Linux Enterprise Server (SLES)**, ensuring complete control over the data plane and control plane, freedom from vendor lock-in, and near-bare-metal performance through rigorous hardware-software optimization.
 
 ```mermaid
 graph TD
-    subgraph Management & Control Plane [Infrastruttura di Management dedicated ed Esterna]
-        MGT_SRV[Orchestratore & Watcher Dinamico]
-        MON_SRV[Prometheus & Grafana / SUSE Manager]
+    subgraph Management & Control Plane [Dedicated External Management Infrastructure]
+        MGT_SRV[Orchestrator & Dynamic Watcher]
+        MON_SRV[Internal Scripts/MRTG/Zabbix]
     end
 
     subgraph KvirtIO 5-Node Compute Cluster
-        N1[Nodo Host 1<br/>SLES KVM]
-        N2[Nodo Host 2<br/>SLES KVM]
-        N3[Nodo Host 3<br/>SLES KVM]
-        N4[Nodo Host 4<br/>SLES KVM]
-        N5[Nodo Host 5<br/>SLES KVM]
+        N1[Host Node 1<br/>SLES KVM]
+        N2[Host Node 2<br/>SLES KVM]
+        N3[Host Node 3<br/>SLES KVM]
+        N4[Host Node 4<br/>SLES KVM]
+        N5[Host Node 5<br/>SLES KVM]
     end
 
     subgraph Network Planes
-        NET_MGMT[VLAN Management / Corosync / iDRAC<br/>1GbE/10GbE]
-        NET_PROD_LM[VLAN Produzione & Live Migration<br/>Bonding LACP 2x 25GbE]
+        NET_MGMT[Management VLAN / Corosync / iDRAC<br/>1GbE/10GbE]
+        NET_PROD_LM[Production & Live Migration VLAN<br/>LACP Bonding 2x 25GbE]
     end
 
     subgraph Storage Area Network SAN
@@ -48,62 +48,63 @@ graph TD
     SAN_SWITCH --> DATA_LUNS
 ```
 
-### 1.2 Obiettivi Chiave del Progetto
-*   **Zero Resource Contention (No Overcommit & No Swap)**: Allocazione deterministica delle risorse fisiche (RAM e CPU) per prevenire fenomeni di "noisy neighbor" e garantire tempi di risposta ultra-bassi e predicibili.
-*   **I/O Parallelism**: Ottimizzazione del percorso dati dallo ipervisore allo storage su SAN Fibre Channel a 32Gb, superando i limiti tradizionali delle code SCSI (`lun_queue_depth`) tramite segmentazione logica e blk-mq.
-*   **Dual-Level Fencing deterministico**: Prevenzione assoluta di split-brain e corruzione dei dati sui volumi condivisi mediante politiche STONITH multilivello fisiche e storage-based.
-*   **Disaccoppiamento del Piano di Controllo**: Isolamento delle logiche di monitoraggio, telemetria e bilanciamento dei carichi all'esterno del cluster di calcolo (Compute Cluster) per preservare la stabilità degli host ipervisori.
+### 1.2 Key Project Objectives
+*   **Zero Resource Contention (No Overcommit & No Swap)**: Deterministic allocation of physical resources (RAM and CPU) to prevent "noisy neighbor" phenomena and guarantee ultra-low, predictable response times.
+*   **I/O Parallelism**: Optimization of the data path from the hypervisor to the 32Gb Fibre Channel SAN storage, overcoming the traditional limitations of SCSI queues (`lun_queue_depth`) through logical segmentation and blk-mq.
+*   **Deterministic Dual-Level Fencing**: Absolute prevention of split-brain and data corruption on shared volumes through multi-level physical and storage-based STONITH policies.
+*   **Control Plane Decoupling**: Isolation of monitoring, telemetry, and load balancing logic outside the Compute Cluster to preserve the stability of the hypervisor hosts.
 
 ---
 
-## 2. Architettura dei Nodi (Compute)
+## 2. Node Architecture (Compute)
 
-Il cluster KvirtIO è composto da **5 nodi fisici omogenei** configurati con SUSE Linux Enterprise Server (SLES) ottimizzato per il ruolo di KVM Hypervisor.
+The KvirtIO cluster consists of at least **3 homogeneous physical nodes** configured with SUSE Linux Enterprise Server (SLES) optimized for the KVM Hypervisor role.
 
-### 2.1 Profilo Hardware Consigliato per Nodo
-Per garantire l'omogeneità e supportare la live migration senza degradamento delle prestazioni, ciascun nodo adotta la seguente configurazione:
-*   **CPU**: Dual Socket Intel Xeon Scalable Platinum o AMD EPYC ad alto numero di core (es. AMD EPYC 9354, 32 core, 3.25GHz).
-*   **RAM**: 1TB o 2TB DDR5 ECC Registered.
-*   **HBA**: Emulex o QLogic Dual-Port Fibre Channel a 32Gb.
-*   **NIC**: Dual-Port 25GbE SFP28 per il traffico di produzione e live migration; Dual-Port 10GbE RJ45 per il management ed il cluster heartbeat.
-*   **Out-of-Band**: Dell iDRAC9 Enterprise (o equivalente HPE iLO 6) con interfaccia di rete dedicata da 1GbE.
+### 2.1 Recommended Hardware Profile per Node
+To ensure homogeneity and support live migration without performance degradation, each node adopts the following configuration:
+*   **CPU**: Dual Socket Intel Xeon Scalable Platinum or high core-count AMD EPYC (e.g. AMD EPYC 9354, 32 cores, 3.25GHz).
+*   **RAM**: 1TB or 2TB DDR5 ECC Registered.
+*   **HBA**: Emulex or QLogic Dual-Port 32Gb Fibre Channel.
+*   **NIC**: Dual-Port 25GbE SFP28 for production traffic and live migration; Dual-Port 10GbE RJ45 for management and cluster heartbeat.
+*   **Out-of-Band**: Dell iDRAC9 Enterprise (or equivalent HPE iLO 6) with a dedicated 1GbE network interface.
 
-### 2.2 Requisito Critico SWAP: Zero Swap Policy (vm.swappiness = 0)
-Nei sistemi di virtualizzazione enterprise operanti con carichi di tipo "IOIntensive" (come database transazionali), la latenza indotta dall'accesso al disco per il paging della memoria host è distruttiva. Se l'host rimette in swap porzioni di RAM appartenenti a una macchina virtuale, il sistema guest subirà un blocco temporaneo o un drop improvviso del throughput di I/O, spesso interpretato dalle applicazioni come un crash.
+### 2.2 Critical SWAP Requirement: Zero Swap Policy (vm.swappiness = 0)
+In enterprise virtualization systems operating with "IOIntensive" workloads (such as transactional databases), the latency induced by disk access for host memory paging is destructive. If the host swaps out portions of RAM belonging to a virtual machine, the guest system will suffer a temporary stall or a sudden drop in I/O throughput, often interpreted by applications as a crash.
 
-Per questo motivo, l'architettura KvirtIO stabilisce la **disabilitazione totale della partizione di swap** su tutti i nodi hypervisor.
+For this reason, the KvirtIO architecture mandates the **complete disabling of the swap partition** on all hypervisor nodes.
 
-#### Configurazione e Hardening sul Kernel SLES
-Durante la fase di installazione del sistema operativo SLES:
-1.  **Esclusione della partizione**: Non viene creata alcuna partizione di swap nei dischi locali dell'host (solitamente configurati in RAID 1 hardware su due SSD/NVMe per il solo OS).
-2.  **Rimozione da `/etc/fstab`**: Qualora presente, ogni riferimento a swap deve essere rimosso.
-3.  **Tuning dei parametri del Kernel (`sysctl`)**:
-    Creare il file `/etc/sysctl.d/99-kvirtio-memory.conf` con i seguenti parametri:
+#### Kernel Hardening Configuration on SLES
+During the SLES operating system installation phase:
+1.  **Partition exclusion**: No swap partition is created on the host's local disks (typically configured in hardware RAID 1 on two SSDs/NVMe drives for the OS only).
+2.  **Removal from `/etc/fstab`**: If present, any reference to swap must be removed.
+3.  **Kernel parameter tuning (`sysctl`)**:
+    Create the file `/etc/sysctl.d/99-kvirtio-memory.conf` with the following parameters:
     ```ini
-    # Disabilita l'aggressività del paging a favore del memory reclaim
+    # Disable paging aggressiveness in favor of memory reclaim
     vm.swappiness = 0
     
-    # Impedisce l'overcommit selvaggio della memoria, assicurando allocazioni reali
+    # Prevent unconstrained memory overcommit, ensuring real allocations
     vm.overcommit_memory = 2
     vm.overcommit_ratio = 90
     
-    # Forza il panic del kernel in caso di esaurimento memoria (OOM) anziché killing casuale dei processi QEMU
+    # Force kernel panic on out-of-memory (OOM) instead of randomly killing vm processes
     vm.panic_on_oom = 1
     kernel.panic = 10
     ```
-4.  **Disabilitazione a caldo**:
+
+4.  **Hot disabling**:
     ```bash
     swapoff -a
     ```
 
-### 2.3 Componenti Software Nativi SLES per la Virtualizzazione
-Il layer di virtualizzazione poggia sui pacchetti nativi del canale SLES Virtualization:
-*   **KVM (Kernel-based Virtual Machine)**: Modulo del kernel Linux (`kvm_intel` o `kvm_amd`) che trasforma il kernel in un hypervisor di Tipo 1.
-*   **QEMU (Quick Emulator)**: Versione ottimizzata per SLES (`qemu-kvm` o `qemu-system-x86_64`) per l'emulazione dell'hardware e l'esecuzione del codice guest in accelerazione hardware tramite `/dev/kvm`.
-*   **Libvirt**: Il demone di management (`libvirtd.service`) e la suite di strumenti associati (`virsh`, API XML) per la gestione del ciclo di vita delle VM.
+### 2.3 Native SLES Software Components for Virtualization
+The virtualization layer relies on native packages from the SLES Virtualization channel:
+*   **KVM (Kernel-based Virtual Machine)**: Linux kernel module (`kvm_intel` or `kvm_amd`) that transforms the kernel into a Type 1 hypervisor.
+*   **QEMU (Quick Emulator)**: SLES-optimized version (`qemu-kvm` or `qemu-system-x86_64`) for hardware emulation and hardware-accelerated guest code execution via `/dev/kvm`.
+*   **Libvirt**: The management daemon (`libvirtd.service`) and associated tool suite (`virsh`, XML API) for VM lifecycle management.
 
-#### Tuning Libvirt/QEMU per VM IOIntensive
-La definizione XML delle macchine virtuali su KvirtIO deve prevedere l'ottimizzazione del controller dei dischi e della memoria tramite Hugepages:
+#### Libvirt/QEMU Tuning for IOIntensive VMs
+The XML definition of virtual machines on KvirtIO must include optimization of the disk controller and memory via Hugepages:
 
 ```xml
 <domain type='kvm'>
@@ -111,7 +112,7 @@ La definizione XML delle macchine virtuali su KvirtIO deve prevedere l'ottimizza
   <memory unit='KiB'>268435456</memory> <!-- 256 GB -->
   <currentMemory unit='KiB'>268435456</currentMemory>
   <memoryBacking>
-    <!-- Utilizzo obbligatorio di Hugepages da 1GB statiche pre-allocate sull'host -->
+    <!-- Mandatory use of 1GB static Hugepages pre-allocated on the host -->
     <hugepages>
       <page size='1048576' unit='KiB'/>
     </hugepages>
@@ -126,11 +127,11 @@ La definizione XML delle macchine virtuali su KvirtIO deve prevedere l'ottimizza
     </numa>
   </cpu>
   <devices>
-    <!-- Controller SCSI ottimizzato con multiqueue abilitato -->
+    <!-- Optimized SCSI controller with multiqueue enabled -->
     <controller type='scsi' index='0' model='virtio-scsi'>
       <driver queues='32' iothread='1'/>
     </controller>
-    <!-- Configurazione del disco basata su lvmlockd (vedere Sezione 3) -->
+    <!-- Disk configuration based on lvmlockd (see Section 3) -->
     <disk type='block' device='disk'>
       <driver name='qemu' type='raw' cache='none' io='native' discard='unmap'/>
       <source dev='/dev/vg_iointensive/lv_vm_db01'/>
@@ -145,21 +146,21 @@ La definizione XML delle macchine virtuali su KvirtIO deve prevedere l'ottimizza
 
 ## 3. Storage Topology & I/O Optimization
 
-I carichi "IOIntensive" necessitano di un'infrastruttura storage con bassa latenza di transito ed elevata capacità di IOPS paralleli. L'architettura KvirtIO si attesta su una **SAN Fibre Channel (FC) a 32Gb** in modalità completamente ridondata.
+"IOIntensive" workloads require a storage infrastructure with low transit latency and high parallel IOPS capacity. The KvirtIO architecture relies on a **32Gb Fibre Channel (FC) SAN** in fully redundant mode.
 
-### 3.1 Il Limite della Code di I/O (lun_queue_depth)
-Nei sistemi operativi Linux, ogni dispositivo a blocchi scansionato dal kernel (inclusi i path multipath mappati dalle LUN esterne) ha una coda di I/O gestita dal driver SCSI. Il parametro `lun_queue_depth` (solitamente impostato a 32 o 64 a seconda dell'HBA) determina quante richieste di I/O concorrenti possono essere inviate a quella specifica LUN prima che il kernel inizi ad accodare le successive in memoria a livello di OS host.
+### 3.1 The I/O Queue Depth Limitation (lun_queue_depth)
+In Linux operating systems, every block device scanned by the kernel (including multipath-mapped external LUN paths) has an I/O queue managed by the SCSI driver. The `lun_queue_depth` parameter (typically set to 32 or 64 depending on the HBA) determines how many concurrent I/O requests can be sent to that specific LUN before the kernel starts queuing subsequent requests in host OS memory.
 
-Se si associa un'unica grande LUN (es. 16TB) a una macchina virtuale database ad alto carico, tutti gli IO thread della VM concorreranno sulla medesima coda SCSI singola. Questo crea un **collo di bottiglia sistemico** a livello di driver host (HBA), saturando la profondità di coda anche se lo storage array sottostante ha ancora bandwidth fisica disponibile.
+If a single large LUN (e.g. 16TB) is assigned to a high-load database virtual machine, all of the VM's I/O threads will compete on the same single SCSI queue. This creates a **systemic bottleneck** at the host driver (HBA) level, saturating the queue depth even when the underlying storage array still has physical bandwidth available.
 
-### 3.2 Strategia Multi-LUN & blk-mq Stripe
-Per superare questo limite, KvirtIO impone una configurazione in cui ogni macchina virtuale con profilo "IOIntensive" poggia su un **Logical Volume (LV) distribuito (striped) su un minimo di 8 LUN fisiche separate**.
+### 3.2 Multi-LUN & blk-mq Stripe Strategy
+To overcome this limitation, KvirtIO mandates a configuration in which every "IOIntensive" virtual machine is backed by a **Logical Volume (LV) distributed (striped) across a minimum of 8 separate physical LUNs**.
 
-#### Esempio Architetturale: Allocazione da 16TB per VM
-Invece di presentare una LUN da 16TB, lo Storage Administrator alloca **8 LUN da 2TB ciascuna** sulla SAN FC.
-*   Ogni singola LUN possiede la propria coda SCSI indipendente a livello di kernel dell'host SLES.
-*   Si ottiene così una profondità di coda complessiva pari a $8 \times$ `lun_queue_depth` della singola LUN (es. $8 \times 64 = 512$ comandi in parallelo).
-*   Il kernel di SLES, sfruttando il sottosistema multiqueue block layer (**blk-mq**), distribuisce il carico di computazione delle code di I/O su core CPU differenti, eliminando i lock software interni all'host.
+#### Architectural Example: 16TB Allocation per VM
+Instead of presenting a single 16TB LUN, the Storage Administrator allocates **8 LUNs of 2TB each** on the FC SAN.
+*   Each individual LUN has its own independent SCSI queue at the SLES host kernel level.
+*   This yields a total queue depth of $8 \times$ `lun_queue_depth` per individual LUN (e.g. $8 \times 64 = 512$ parallel commands).
+*   The SLES kernel, leveraging the multiqueue block layer subsystem (**blk-mq**), distributes I/O queue computation across different CPU cores, eliminating software locks internal to the host.
 
 ```
                   +-------------------------------------------------+
@@ -169,167 +170,165 @@ Invece di presentare una LUN da 16TB, lo Storage Administrator alloca **8 LUN da
                                            |  (virtio-scsi MultiQueue)
                                            v
                   +-------------------------------------------------+
-                  |       Logical Volume Striped (LVM) su Host      |
+                  |       Striped Logical Volume (LVM) on Host      |
                   |           /dev/vg_iointensive/lv_vm_db01        |
                   +-------------------------------------------------+
                      /       /       /     |     \       \       \
                     /       /       /      |      \       \       \
                    v       v       v       v       v       v       v
-                 [LUN1]  [LUN2]  [LUN3]  [LUN4]  [LUN5]  [LUN6]  [LUN7]  [LUN8] (Ogni LUN = 2TB)
+                 [LUN1]  [LUN2]  [LUN3]  [LUN4]  [LUN5]  [LUN6]  [LUN7]  [LUN8] (Each LUN = 2TB)
                  Depth64 Depth64 Depth64 Depth64 Depth64 Depth64 Depth64 Depth64
                    |       |       |       |       |       |       |       |
                    +-------+-------+-------+-------+-------+-------+-------+--> [SAN 32Gb FC]
                                            Total Queue Depth = 512
 ```
 
-### 3.3 Gestione dei Volumi Condivisi: Cluster LVM (lvmlockd & dlm)
-Poiché le macchine virtuali devono poter migrare a caldo da un nodo all'altro, tutti i nodi del cluster devono vedere contemporaneamente le LUN di storage. Tuttavia, l'accesso simultaneo incontrollato a un Volume Group (VG) LVM da parte di più host causerebbe la corruzione immediata dei metadati LVM.
+### 3.3 Shared Volume Management: Cluster LVM (lvmlockd & dlm)
+Since virtual machines must be able to live-migrate from one node to another, all cluster nodes must simultaneously see the storage LUNs. However, uncontrolled simultaneous access to an LVM Volume Group (VG) from multiple hosts would immediately cause corruption of LVM metadata.
 
-KvirtIO adotta **lvmlockd** (LVM lock daemon) integrato con il **DLM (Distributed Lock Manager)** di SLES. Questo stack sostituisce il vecchio demone `clvmd`.
+KvirtIO adopts **lvmlockd** (LVM lock daemon) integrated with the **DLM (Distributed Lock Manager)** of SLES. This stack replaces the legacy `clvmd` daemon.
 
-#### Funzionamento del Blocco dei Volumi
-1.  **DLM**: Gestisce il coordinamento dei lock tra i nodi via rete attraverso il cluster manager Pacemaker/Corosync.
-2.  **lvmlockd**: Riceve le richieste di allocazione o modifica di metadati LVM e le convalida tramite DLM.
-3.  Quando una VM viene avviata sul Nodo 1, `lvmlockd` acquisisce un lock esclusivo (write lock) sul Logical Volume della VM. Gli altri nodi possono vedere il volume ma non possono scrivervi nè avviarlo, garantendo la sicurezza.
-4.  Durante la Live Migration, il lock viene rilasciato in modo atomico dal Nodo 1 e acquisito dal Nodo 2, coordinato da Pacemaker.
+#### Volume Locking Operation
+1.  **DLM**: Manages lock coordination between nodes over the network through the Pacemaker/Corosync cluster manager.
+2.  **lvmlockd**: Receives LVM metadata allocation or modification requests and validates them through DLM.
+3.  When a VM is started on Node 1, `lvmlockd` acquires an exclusive lock (write lock) on the VM's Logical Volume. Other nodes can see the volume but cannot write to it or start it, ensuring safety.
+4.  During Live Migration, the lock is atomically released by Node 1 and acquired by Node 2, coordinated by Pacemaker.
 
-#### Workflow di configurazione dello Storage su Host SLES
-1.  **Inizializzazione di DLM**: Assicurarsi che il servizio DLM sia integrato nel cluster Pacemaker.
-2.  **Configurazione di LVM**: Abilitare `locking_type = 1` ed impostare `use_lvmlockd = 1` in `/etc/lvm/lvm.conf`.
-3.  **Creazione dei Physical Volumes (PV)** sulle 8 LUN multipath (es. `/dev/mapper/mpatha` fino a `/dev/mapper/mpathh`):
+#### Storage Configuration Workflow on SLES Host
+1.  **DLM Initialization**: Ensure the DLM service is integrated into the Pacemaker cluster.
+2.  **LVM Configuration**: Enable `locking_type = 1` and set `use_lvmlockd = 1` in `/etc/lvm/lvm.conf`.
+3.  **Create Physical Volumes (PV)** on the 8 multipath LUNs (e.g. `/dev/mapper/mpatha` through `/dev/mapper/mpathh`):
     ```bash
     pvcreate /dev/mapper/mpatha /dev/mapper/mpathb /dev/mapper/mpathc /dev/mapper/mpathd \
              /dev/mapper/mpathe /dev/mapper/mpathf /dev/mapper/mpathg /dev/mapper/mpathh
     ```
-4.  **Creazione del Volume Group di Cluster**:
-    Si utilizza il flag `--lock-type dlm` per indicare a LVM di delegare i lock al cluster:
+4.  **Create the Cluster Volume Group**:
+    Use the `--lock-type dlm` flag to instruct LVM to delegate locks to the cluster:
     ```bash
     vgcreate --lock-type dlm vg_iointensive \
              /dev/mapper/mpatha /dev/mapper/mpathb /dev/mapper/mpathc /dev/mapper/mpathd \
              /dev/mapper/mpathe /dev/mapper/mpathf /dev/mapper/mpathg /dev/mapper/mpathh
     ```
-5.  **Creazione del Logical Volume Striped**:
-    Si crea il Logical Volume distribuendo i blocchi su tutti gli 8 PV fisici per massimizzare il parallelismo delle code:
+5.  **Create the Striped Logical Volume**:
+    Create the Logical Volume distributing blocks across all 8 physical PVs to maximize queue parallelism:
     ```bash
     lvcreate -i 8 -I 64k -n lv_vm_db01 -L 16T vg_iointensive
     ```
-    *   `-i 8`: Numero di stripes (coincide con il numero di LUN/PV).
-    *   `-I 64k`: Dimensione dello stripe unit (64 KB ottimale per la maggior parte dei DB relazionali).
+    *   `-i 8`: Number of stripes (matches the number of LUNs/PVs).
+    *   `-I 64k`: Stripe unit size (64 KB is optimal for most relational databases).
 
 ---
 
 ## 4. High Availability, Fencing & Quorum (STONITH)
 
-L'alta affidabilità del cluster KvirtIO a 5 nodi è interamente orchestrata dallo stack **High Availability Enterprise Extension** di SLES, basato su Pacemaker (il cluster manager) e Corosync (il motore di comunicazione interna).
+The high availability of the 5-node KvirtIO cluster is entirely orchestrated by the **High Availability Enterprise Extension** stack of SLES, based on Pacemaker (the cluster manager) and Corosync (the internal communication engine).
 
 ### 4.1 Pacemaker & Corosync
-*   **Corosync**: Gestisce la messaggistica a bassa latenza (heartbeat) tra i nodi e rileva la perdita di connettività. Nel cluster KvirtIO a 5 nodi, il quorum minimo richiesto per il corretto funzionamento è di **3 nodi attivi** ($\text{Quorum} = \lfloor N/2 \rfloor + 1$).
-*   **Pacemaker**: Monitora costantemente lo stato dei nodi e delle risorse virtuali (le VM definite tramite resource agent `ocf:heartbeat:VirtualDomain`). In caso di fallimento hardware di un nodo, Pacemaker decide su quale dei nodi rimanenti riavviare le VM affette.
+*   **Corosync**: Manages low-latency messaging (heartbeat) between nodes and detects connectivity loss. In the 5-node KvirtIO cluster, the minimum quorum required for correct operation is **3 active nodes** ($\text{Quorum} = \lfloor N/2 \rfloor + 1$).
+*   **Pacemaker**: Continuously monitors the state of nodes and virtual resources (VMs defined via the `ocf:heartbeat:VirtualDomain` resource agent). In the event of a hardware failure on a node, Pacemaker decides on which of the remaining nodes to restart the affected VMs.
 
-### 4.2 Configurazione del Fencing Multilivello (STONITH)
-Nelle architetture di storage condiviso (SAN FC) con LVM clusterizzato, il peggior scenario immaginabile è la perdita di connettività di rete di un nodo senza che questo si spenga (scenario di split-brain). Se due nodi pensano di essere gli unici sopravvissuti e tentano di scrivere contemporaneamente sullo stesso Logical Volume, si verifica una **corruzione irreversibile del filesystem o del database**.
+### 4.2 Multi-Level Fencing Configuration (STONITH)
+In shared-storage architectures (FC SAN) with clustered LVM, the worst imaginable scenario is a node losing network connectivity without shutting down (split-brain scenario). If two nodes believe they are the sole survivors and attempt to write simultaneously to the same Logical Volume, **irreversible filesystem or database corruption** occurs.
 
-Per prevenire questo scenario, Pacemaker impone il meccanismo **STONITH (Shoot The Other Node In The Head)**. L'architettura KvirtIO implementa un sistema a **due livelli indipendenti**, garantendo che un nodo non responsivo venga isolato fisicamente ed elettricamente prima che le sue VM vengano avviate altrove.
+To prevent this scenario, Pacemaker enforces the **STONITH (Shoot The Other Node In The Head)** mechanism. The KvirtIO architecture implements a **two independent levels** system, guaranteeing that an unresponsive node is physically and electrically isolated before its VMs are started elsewhere.
 
 ```
                         +---------------------------+
-                        |      Nodo da Fencare      |
+                        |      Node to be Fenced    |
                         +---------------------------+
                                       |
               +-----------------------+-----------------------+
               |                                               |
-              v (Livello 1: Rete Out-of-Band)                v (Livello 2: Witness SAN)
+              v (Level 1: Out-of-Band Network)               v (Level 2: Witness SAN)
      +-----------------+                             +-----------------+
      |   fence_idrac   |                             |    SBD Daemon   |
      +-----------------+                             +-----------------+
               |                                               |
-              | (Comando IPMI/OOB)                            | (Mancato Heartbeat/Mailbox)
+              | (IPMI/OOB Command)                            | (Missed Heartbeat/Mailbox)
               v                                               v
-     [Spegni Chassis]                                [Watchdog Hardware]
+     [Power Off Chassis]                            [Hardware Watchdog]
               |                                               |
               +-----------------------+-----------------------+
                                       |
                                       v
-                             [Nodo Off/Reset]
+                             [Node Off/Reset]
 ```
 
-#### Livello A: Fencing Fisico (fence_idrac)
-*   **Agente**: `fence_idrac` (basato su protocollo Redfish o IPMI su rete out-of-band).
-*   **Funzionamento**: In caso di mancata risposta del nodo tramite Corosync, Pacemaker invia un comando diretto alla scheda iDRAC del nodo target per richiedere un **hard reset elettrico immediato (poweroff / powercycle)**.
-*   Questa operazione garantisce la disattivazione del nodo a livello hardware.
+#### Level A: Physical Fencing (fence_idrac)
+*   **Agent**: `fence_idrac` (based on Redfish or IPMI protocol over the out-of-band network).
+*   **Operation**: In case of node non-response via Corosync, Pacemaker sends a direct command to the iDRAC card of the target node to request an **immediate hard electrical reset (poweroff / powercycle)**.
+*   This operation guarantees the deactivation of the node at the hardware level.
 
-#### Livello B: Fencing di Storage / Witness (SBD - Storage-based Death)
-In caso di parziale fallimento della rete di management che renda impossibile contattare sia l'host sia la scheda iDRAC, entra in funzione il meccanismo **SBD**.
-*   **Witness LUN**: Viene creata una LUN dedicata da **100MB** sulla SAN Fibre Channel (condivisa tra tutti e 5 i nodi). Questa LUN non ospita filesystem ed è inizializzata per l'uso esclusivo di SBD.
-*   **Watchdog Hardware**: Ogni nodo deve avere un modulo watchdog di sistema attivo a livello kernel (es. `iTCO_wdt` per hardware Intel o `/dev/watchdog`).
-*   **Funzionamento**:
-    1.  Il demone `sbd` in esecuzione su ciascun host scrive costantemente un heartbeat sulla LUN condivisa e interroga la propria "mailbox" riservata sulla stessa LUN.
-    2.  Se Pacemaker stabilisce che il Nodo 3 è isolato e non è raggiungibile via rete, scrive un messaggio di "fencing target" nella mailbox del Nodo 3 presente sulla LUN SBD.
-    3.  Il demone `sbd` del Nodo 3 legge il messaggio di fencing sulla LUN (poiché il percorso FC a 32Gb è ancora attivo) ed esegue un **suicidio immediato del nodo** tramite il reset hardware controllato dal watchdog Linux, bypassando totalmente la rete IP e lo stack software di spegnimento.
-    4.  Se il demone `sbd` smette di scrivere o si blocca, il watchdog hardware non riceve più il segnale di "keep-alive" e riavvia forzatamente la macchina fisica dopo pochi secondi.
+#### Level B: Storage / Witness Fencing (SBD - Storage-based Death)
+In the event of a partial management network failure that makes it impossible to contact both the host and the iDRAC card, the **SBD** mechanism kicks in.
+*   **Witness LUN**: A dedicated **100MB** LUN is created on the Fibre Channel SAN (shared among all 5 nodes). This LUN does not host a filesystem and is initialized for exclusive use by SBD.
+*   **Hardware Watchdog**: Each node must have an active system watchdog module at the kernel level (e.g. `iTCO_wdt` for Intel hardware or `/dev/watchdog`).
+*   **Operation**:
+    1.  The `sbd` daemon running on each host continuously writes a heartbeat to the shared LUN and polls its reserved "mailbox" on the same LUN.
+    2.  If Pacemaker determines that Node 3 is isolated and unreachable via network, it writes a "fencing target" message into Node 3's mailbox on the SBD LUN.
+    3.  Node 3's `sbd` daemon reads the fencing message on the LUN (since the 32Gb FC path is still active) and performs an **immediate node self-fence** via the Linux watchdog-controlled hardware reset, completely bypassing the IP network and the software shutdown stack.
+    4.  If the `sbd` daemon stops writing or hangs, the hardware watchdog no longer receives the "keep-alive" signal and forcibly restarts the physical machine after a few seconds.
 
-### 4.3 Divieto di Script Custom
-È severamente vietato l'utilizzo di script custom o meccanismi applicativi operanti a livello di guest (es. ping all'interno della VM, agenti software all'interno del sistema operativo guest) per scatenare il fencing o la migrazione forzata degli host. I motivi ingegneristici sono:
-*   **Cascading Failures**: Un blocco della rete a livello VM (es. disservizio su uno switch di produzione guest) non riflette necessariamente un problema di salute dell'host hypervisor. Eseguire il fencing dell'host causerebbe il riavvio non necessario di tutte le altre VM sane ospitate sullo stesso nodo.
-*   **False Positività**: L'elevato carico applicativo all'interno di una VM potrebbe ritardare le risposte di uno script di monitoraggio custom, generando falsi positivi con conseguenti reboot ciclici (fencing loops).
-*   **Inconsistenza dello Stato**: Solo il cluster manager (Pacemaker) possiede la visione globale dello stato delle risorse e della topologia dello storage condiviso. Solo Pacemaker può decidere in modo sicuro e coordinato l'isolamento di un nodo.
+### 4.3 Prohibition of Custom Scripts
+The use of custom scripts or application-level mechanisms operating at the guest level (e.g. ping inside the VM, software agents inside the guest OS) to trigger fencing or forced host migration is strictly forbidden. The engineering reasons are:
+*   **Cascading Failures**: A network failure at the VM level (e.g. a disruption on a guest production switch) does not necessarily reflect a health problem on the hypervisor host. Fencing the host would cause an unnecessary restart of all other healthy VMs hosted on the same node.
+*   **False Positives**: High application load inside a VM could delay the responses of a custom monitoring script, generating false positives with consequent cyclical reboots (fencing loops).
+*   **State Inconsistency**: Only the cluster manager (Pacemaker) has a global view of resource state and shared storage topology. Only Pacemaker can safely and coordinately decide on node isolation.
 
 ---
 
-## 5. Control Plane & Orchestrazione Esterna
+## 5. Control Plane & External Orchestration
 
-Il principio cardine del design di KvirtIO è la **separazione dei piani**. Gli host ipervisori devono dedicare i propri cicli CPU, la memoria e l'I/O storage esclusivamente alla computazione delle macchine virtuali dei clienti.
+The cornerstone principle of the KvirtIO design is **plane separation**. Hypervisor hosts must dedicate their CPU cycles, memory, and storage I/O exclusively to computing customer virtual machines.
 
-### 5.1 Esternalizzazione del Control Plane e dei Watcher
-Tutti i componenti software non critici per l'esecuzione diretta del piano dati (data plane) devono risiedere su un'infrastruttura di gestione (Management Plane) fisicamente ed logicamente disaccoppiata:
-*   **Monitoring e Log Collection**: I demoni di esportazione delle metriche (es. `prometheus-node-exporter`, `libvirt-exporter`) girano sugli host KVM con priorità CPU minima (`nice` impostato a valori alti) e inviano i dati a un cluster Prometheus/Grafana esterno.
-*   **Dynamic Balancer & Capacity Management**: Eventuali script di analisi predittiva del carico o demoni incaricati del bilanciamento dinamico delle risorse (es. DRS custom che richiama le API di live migration via `virsh` in base all'uso della CPU host) devono essere eseguiti all'esterno del cluster KVM (su VM o server dedicati alla gestione). Tali watcher interrogano l'API di `libvirt` da remoto (tramite connessione cifrata TLS) ed effettuano le chiamate necessarie senza gravare sul kernel degli host ipervisori.
+### 5.1 Externalization of the Control Plane and Watchers
+All software components that are not critical for the direct execution of the data plane must reside on a management infrastructure (Management Plane) that is physically and logically decoupled:
+*   **Monitoring and Log Collection**: Metric export daemons (e.g. `prometheus-node-exporter`, `libvirt-exporter`) run on KVM hosts with minimum CPU priority (`nice` set to high values) and send data to an external Prometheus/Grafana cluster.
+*   **Dynamic Balancer & Capacity Management**: Any predictive load analysis scripts or daemons responsible for dynamic resource balancing (e.g. custom DRS that invokes live migration APIs via `virsh` based on host CPU usage) must run outside the KVM cluster (on VMs or servers dedicated to management). These watchers query the `libvirt` API remotely (via TLS-encrypted connection) and make the necessary calls without burdening the hypervisor host kernels.
 
-### 5.2 Topologia e Segregazione della Rete
-La rete del cluster KvirtIO è strutturata per isolare rigidamente i flussi di traffico su interfacce fisiche e logiche (VLAN) separate.
+### 5.2 Network Topology and Segregation
+The KvirtIO cluster network is structured to strictly isolate traffic flows on separate physical interfaces and logical interfaces (VLANs).
 
-#### Schema Logico delle Connessioni di Rete per Nodo
+#### Logical Network Connection Schema per Node
 ```
                          +-----------------------------------+
-                         |             Nodo Host             |
+                         |             Host Node             |
                          +-----------------------------------+
                            /                               \
         (Dual 10GbE PCI-e) /                                 \ (Dual 25GbE LACP Bond)
                           /                                   \
   +--------------------------------+                 +--------------------------------+
-  |  Int. Fisiche: eth0 / eth1     |                 |   Int. Fisiche: ens1 / ens2    |
+  |  Physical Intf.: eth0 / eth1   |                 |   Physical Intf.: ens1 / ens2  |
   +--------------------------------+                 +--------------------------------+
      |             |             |                      |                          |
      v             v             v                      v                          v
   [VLAN 10]     [VLAN 11]     [OOB IP]               [VLAN 20]                  [VLAN 30+]
   Management   Corosync HB     iDRAC                  Live Migration             VM Prod Traffic
-  (SSH/API)    (Multicast)   (Fencing)               (Senza Limiti)             (VLAN Trunking)
+  (SSH/API)    (Multicast)   (Fencing)               (Uncapped)                 (VLAN Trunking)
 ```
 
-1.  **Management / Cluster Network (Dual 10GbE / Interfacce Fisiche Separate)**:
-    *   **VLAN 10 - Management**: Traffico per l'amministrazione remota via SSH, chiamate API `libvirt` e monitoraggio.
-    *   **VLAN 11 - Corosync Heartbeat**: Canale a bassissima latenza dedicato esclusivamente alla messaggistica del cluster. I pacchetti Corosync devono avere la priorità massima ed essere configurati con QoS/CoS dedicati a livello di switch fisici.
-    *   **Rete OOB (iDRAC)**: Rete cablata fisicamente separata (su switch dedicati alla gestione dell'infrastruttura hardware) per l'accesso protetto alle schede iDRAC dei 5 nodi fisici e per l'instradamento dei comandi di STONITH `fence_idrac`.
+1.  **Management / Cluster Network (Dual 10GbE / Separate Physical Interfaces)**:
+    *   **VLAN 10 - Management**: Traffic for remote administration via SSH, `libvirt` API calls, and monitoring.
+    *   **VLAN 11 - Corosync Heartbeat**: Ultra-low latency channel dedicated exclusively to cluster messaging. Corosync packets must have the highest priority and be configured with dedicated QoS/CoS at the physical switch level.
+    *   **OOB Network (iDRAC)**: Physically separate cabled network (on switches dedicated to hardware infrastructure management) for secure access to the iDRAC cards of the 5 physical nodes and for routing STONITH `fence_idrac` commands.
 
-2.  **Produzione & Live Migration Plane (Dual 25GbE SFP28 in Bonding)**:
-    *   Le due interfacce a 25GbE sono configurate in **LACP Bonding (Mode 4)** a livello di sistema operativo host (usando il modulo del kernel `bonding` di SLES) per garantire ridondanza e aggregazione di banda.
-    *   La configurazione del link aggregation utilizza la politica di hashing L3+L4 (`xmit_hash_policy = layer3+4`) per ottimizzare la distribuzione dei flussi di rete TCP.
-    *   Sul bond logico vengono attestate due tipologie di traffico tramite tag VLAN:
-        *   **VLAN 20 - Live Migration**: Dedicata esclusivamente al transito della memoria RAM delle macchine virtuali durante i processi di migrazione a caldo tra gli host. Questa rete richiede il massimo throughput disponibile senza cap software, per completare il trasferimento delle pagine di memoria nel minor tempo possibile ed evitare il degrado delle performance della VM durante il "dirtying phase".
-        *   **VLAN 30+ - VM Production**: VLAN trunked passate direttamente all'interno delle macchine virtuali tramite switch virtuali dell'host (es. Linux Bridges o Open vSwitch) per consentire la connettività di rete dei servizi applicativi forniti dalle VM.
+2.  **Production & Live Migration Plane (Dual 25GbE SFP28 in Bonding)**:
+    *   The two 25GbE interfaces are configured in **LACP Bonding (Mode 4)** at the host OS level (using the SLES kernel `bonding` module) to ensure redundancy and bandwidth aggregation.
+    *   The link aggregation configuration uses the L3+L4 hashing policy (`xmit_hash_policy = layer3+4`) to optimize TCP network flow distribution.
+    *   Two types of traffic are attached to the logical bond via VLAN tagging:
+        *   **VLAN 20 - Live Migration**: Dedicated exclusively to the transit of virtual machine RAM during hot migration processes between hosts. This network requires maximum available throughput without software caps, to complete the memory page transfer in the shortest possible time and avoid VM performance degradation during the "dirtying phase".
+        *   **VLAN 30+ - VM Production**: VLANs trunked directly into virtual machines via host virtual switches (e.g. Linux Bridges or Open vSwitch) to enable network connectivity for the application services provided by the VMs.
 
 ---
 
-## 6. Matrice delle Scelte Architetturali e Motivazioni Ingegneristiche
+## 6. Architectural Decision Matrix and Engineering Rationale
 
-| Componente | Scelta Tecnologica | Alternativa Esclusa | Motivazione Ingegneristica |
+| Component | Technology Choice | Excluded Alternative | Engineering Rationale |
 | :--- | :--- | :--- | :--- |
-| **Ipervisore** | KVM Nativo (SLES) | VMware ESXi / Hyper-V | Controllo completo dello stack Linux, riduzione dei costi di licenza, integrazione diretta con il kernel SLES Enterprise e facilità di automazione via API Libvirt. |
-| **Gestione Swap** | Disabilitata staticamente + `vm.swappiness=0` | Swap attiva su disco veloce (SSD) | Eliminazione del rischio di latenze spurie indotte dall'host che effettua il paging della memoria allocata alle macchine virtuali. La RAM deve essere deterministica. |
-| **Topologia Storage** | Multi-LUN Striped (8 LUN da 2TB per VM da 16TB) | LUN Singola da 16TB | Parallelizzazione delle code a livello di kernel host. Si passa da una queue depth singola (es. 64) ad una coda aggregata multipath (512) sfruttando blk-mq. |
-| **Volume Locking** | `lvmlockd` + `dlm` | Legacy `clvmd` | Maggiore resilienza, migliore gestione dei cluster Pacemaker moderni, eliminazione del single-point-of-failure di clvmd in caso di freeze del cluster. |
-| **Fencing Livello 1** | `fence_idrac` (OOB) | Fencing via rete VM | Garantisce il reset elettrico pulito del nodo a livello hardware, indipendentemente dallo stato del sistema operativo host. |
-| **Fencing Livello 2** | SBD (Witness LUN + Watchdog) | Script di ping di rete | Offre un canale di quorum e auto-isolamento (suicidio dell'host) tramite hardware watchdog operante direttamente sul bus storage SAN FC, immune a guasti di rete IP. |
-| **Rete Live Migration** | Rete dedicata 2x25GbE Bonded | Condivisione con la rete di Management | Previene la saturazione dei canali di comunicazione del cluster (Corosync) durante il trasferimento massivo della RAM di VM di grandi dimensioni (256GB+), riducendo la durata del blocco transitorio (downtime della migrazione). |
-
-
+| **Hypervisor** | Native KVM (SLES) | VMware ESXi / Hyper-V | Full control of the Linux stack, reduced licensing costs, direct integration with the SLES Enterprise kernel and ease of automation via Libvirt API. |
+| **Swap Management** | Statically disabled + `vm.swappiness=0` | Active swap on fast disk (SSD) | Eliminates the risk of spurious latencies induced by the host paging memory allocated to virtual machines. RAM must be deterministic. |
+| **Storage Topology** | Multi-LUN Striped (8 LUNs of 2TB for a 16TB VM) | Single 16TB LUN | Parallelization of queues at the host kernel level. Moves from a single queue depth (e.g. 64) to an aggregated multipath queue (512) leveraging blk-mq. |
+| **Volume Locking** | `lvmlockd` + `dlm` | Legacy `clvmd` | Greater resilience, better management of modern Pacemaker clusters, elimination of clvmd single-point-of-failure in case of cluster freeze. |
+| **Fencing Level 1** | `fence_idrac` (OOB) | Fencing via VM network | Guarantees a clean electrical reset of the node at the hardware level, independent of the host OS state. |
+| **Fencing Level 2** | SBD (Witness LUN + Watchdog) | Network ping script | Provides a quorum and self-isolation channel (host suicide) via hardware watchdog operating directly on the SAN FC storage bus, immune to IP network failures. |
+| **Live Migration Network** | Dedicated 2x25GbE Bonded network | Shared with Management network | Prevents saturation of cluster communication channels (Corosync) during the massive RAM transfer of large VMs (256GB+), reducing the transient block duration (migration downtime). |
