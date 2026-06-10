@@ -58,7 +58,7 @@ graph TD
 
 ## 2. Architettura dei Nodi (Compute)
 
-Il cluster KvirtIO è composto da almeno **3 nodi fisici omogenei** configurati con SUSE Linux Enterprise Server (SLES) ottimizzato per il ruolo di KVM Hypervisor.
+Il cluster KvirtIO è composto da almeno **3 nodi fisici omogenei** (non è stato testato con nodi eterogenei) configurati con SUSE Linux Enterprise Server (SLES) ottimizzato per il ruolo di KVM Hypervisor.
 
 ### 2.1 Profilo Hardware Consigliato per Nodo
 Per garantire l'omogeneità e supportare la live migration senza degradamento delle prestazioni, ciascun nodo adotta la seguente configurazione:
@@ -95,6 +95,7 @@ Durante la fase di installazione del sistema operativo SLES:
     ```bash
     swapoff -a
     ```
+Questa configurazione è necessaria per essendo un cluster per fare in modo, che se un nodo dovesse andare in esaurimento della memoria, cominci a killare in mandiera casuale i processi di QEMU/KVM forzandone il passaggio sugli altri nodi del cluster. 
 
 ### 2.3 Componenti Software Nativi SLES per la Virtualizzazione
 Il layer di virtualizzazione poggia sui pacchetti nativi del canale SLES Virtualization:
@@ -110,21 +111,13 @@ La definizione XML delle macchine virtuali su KvirtIO deve prevedere l'ottimizza
   <name>kvirtio-vm-db01</name>
   <memory unit='KiB'>268435456</memory> <!-- 256 GB -->
   <currentMemory unit='KiB'>268435456</currentMemory>
-  <memoryBacking>
-    <!-- Utilizzo obbligatorio di Hugepages da 1GB statiche pre-allocate sull'host -->
-    <hugepages>
-      <page size='1048576' unit='KiB'/>
-    </hugepages>
-    <locked/>
-  </memoryBacking>
-  <vcpu placement='static'>32</vcpu>
-  <cpu mode='host-passthrough'>
-    <topology sockets='2' dies='1' cores='16' threads='1'/>
-    <numa>
-      <cell id='0' cpus='0-15' memory='134217728' unit='KiB' memAccess='shared'/>
-      <cell id='1' cpus='16-31' memory='134217728' unit='KiB' memAccess='shared'/>
-    </numa>
-  </cpu>
+  <memballoon model='none'/> <!-- da non accendere assolutamente per i sistemi database, solo per i sistemi app server -->
+  <vcpu placement='auto'>16</vcpu>
+
+  <numatune>
+    <memory mode='strict' placement='auto'/>
+  </numatune>
+</domain>
   <devices>
     <!-- Controller SCSI ottimizzato con multiqueue abilitato -->
     <controller type='scsi' index='0' model='virtio-scsi'>
@@ -197,7 +190,7 @@ Le macchine virtuali applicative hanno carichi fluttuanti e possono sfruttare il
   <memory unit='GiB'>64</memory>
   <currentMemory unit='GiB'>16</currentMemory>
 
-  <memballoon model='virtio'>
+  <memballoon model='virtio'> <!-- come accennato prima viene acceso il ballooning sui sistemi app server -->
     <stats period='10'/>
   </memballoon>
 
