@@ -378,6 +378,68 @@ In caso di parziale fallimento della rete di management che renda impossibile co
 *   **False Positività**: L'elevato carico applicativo all'interno di una VM potrebbe ritardare le risposte di uno script di monitoraggio custom, generando falsi positivi con conseguenti reboot ciclici (fencing loops).
 *   **Inconsistenza dello Stato**: Solo il cluster manager (Pacemaker) possiede la visione globale dello stato delle risorse e della topologia dello storage condiviso. Solo Pacemaker può decidere in modo sicuro e coordinato l'isolamento di un nodo.
 
+### 4.4 Policy di Live Migration ed Isteresi in Pacemaker
+
+L'attivazione dei processi di Live Migration e la reattività del cluster in caso di anomalie o sovraccarichi devono essere regolate da policy ferree per impedire migrazioni cicliche ingiustificate (effetto ping-pong) e per assicurare l'integrità dei dati durante il transito RAM sulla rete a 50Gbps (VLAN 20).
+
+#### 4.4.1 Configurazione dell'Isteresi di Cluster (Resource Stickiness)
+Per impostazione predefinita, Pacemaker tende a ricollocare una risorsa sul suo nodo d'origine non appena questo torna online o si normalizza. In un ambiente di produzione, questo comportamento è distruttivo: lo spostamento di una VM ad alto carico ha un costo computazionale e di rete che non deve essere duplicato senza motivo.
+
+KvirtIO impone una configurazione globale ad alta inerzia tramite il parametro `resource-stickiness`.
+
+```bash
+# Impostazione della stickiness predefinita a livello di cluster Pacemaker
+crm configure rsc_defaults resource-stickiness=1000
+```
+
+**Logica Matematica dell'Isteresi combinata con il Watcher**
+
+Il watcher esterno (`kvirtio-host-watcher.sh`) aggiorna l'attributo di nodo `status-load` impostandolo su `overloaded` se i limiti vengono superati per 3 check consecutivi. Pacemaker intercetta questa variazione tramite una regola di localizzazione condizionale dotata di un punteggio negativo (Negative Score). La regola viene definita come segue per ogni VM:
+
+```
+crm configure location loc_vm_db01 vm_db01 \
+    rule id="migrate-on-overload" score="-1500" status-load eq "overloaded"
+```
+
+L'isteresi si risolve secondo questa matrice di punteggio:
+
+*   **Stato Nominale**: La VM gira sul Nodo 1. Ha un valore di preferenza base più la sua `resource-stickiness` (+1000). Il cluster non la muove.
+*   **Stato di Overload**: Il watcher rileva la saturazione e imposta `status-load="overloaded"`. Pacemaker applica il vincolo di -1500. Il punteggio del Nodo 1 crolla a $-500$ ($1000 - 1500$). Poiché un qualsiasi altro nodo vuoto ha un punteggio di $0$, Pacemaker avvia istantaneamente la Live Migration verso l'host più scarico.
+*   **Rientro dell'Allarme**: Una volta evacuata la VM, il carico sul Nodo 1 scende e il watcher lo reimposta su `healthy`. La VM si trova ora sul Nodo 2, protetta dalla sua nuova `resource-stickiness` di +1000 sul Nodo 2. Nonostante il Nodo 1 sia tornato sano (punteggio 0), la VM rimane stabilmente sul Nodo 2, poiché $1000 > 0$. Questo azzera i micro-spostamenti e stabilizza l'infrastruttura.
+
+#### 4.4.2 Tolleranza ai Guasti Locali (Migration Threshold)
+Se una VM sperimenta un problema interno transitorio (es. un timeout del resource agent di Libvirt o un errore isolato di avvio del processo QEMU), Pacemaker non deve dare immediatamente per spacciato l'host fisico eseguendo una migrazione di massa.
+
+Si introduce il parametro `migration-threshold` per allineare l'HA del cluster all'isteresi dei watcher:
+
+```bash
+# Imposta la tolleranza a 3 fallimenti locali prima di decretare l'evacuazione
+crm configure rsc_defaults migration-threshold=3
+```
+
+Se il resource agent della VM fallisce il monitoraggio locale per 3 volte di fila, Pacemaker marca il nodo come non idoneo per quella specifica risorsa e la sposta a caldo (se possibile) o la riavvia su un altro host.
+
+#### 4.4.3 Parametrizzazione della Live Migration (Resource Agent)
+La migrazione a caldo deve essere configurata per sfruttare nativamente l'accelerazione del kernel ed evitare colli di bottiglia che limiterebbero la banda dei link a 25GbE.
+
+La definizione della risorsa `VirtualDomain` in Pacemaker deve includere le opzioni di trasporto dedicate alla VLAN di Live Migration (VLAN 20):
+
+```
+primitive vm_db01 ocf:heartbeat:VirtualDomain \
+    params config="/dev/vg_vm_definition/vm_db01.xml" \
+    hypervisor="qemu:///system" \
+    migration_transport="ssh" \
+    migration_user="kvirtwatch" \
+    migration_network_suffix="-lm.kvirtio.local" \
+    op monitor interval="10s" timeout="30s" \
+    op start interval="0s" timeout="90s" \
+    op stop interval="0s" timeout="90s" \
+    meta allow-migrate="true"
+```
+
+*   **`allow-migrate="true"`**: Abilita esplicitamente Pacemaker a eseguire la migrazione a caldo (Live) anziché un ciclo distruttivo di Stop/Start durante lo spostamento tra nodi.
+*   **`migration_network_suffix`**: Forza Libvirt a instradare il traffico di migrazione sulla rete dedicata (`-lm.kvirtio.local`), risolvendo l'hostname del nodo di destinazione sulle interfacce attestate sulla VLAN 20, sfruttando appieno i 50Gbps del bond ed escludendo la rete di management o di produzione dal carico di copia della RAM.
+
 ---
 
 ## 5. Control Plane & Orchestrazione Esterna
@@ -439,6 +501,7 @@ La rete del cluster KvirtIO è strutturata per isolare rigidamente i flussi di t
 | **QoS di Rete** | AQM Globale `fq_codel` su bond fisico | Policing per-VM in XML Libvirt | Eliminazione del "noisy neighbor" senza overhead amministrativo: il kernel differenzia autonomamente flussi elefante e topolino, garantendo latenza minima ai flussi interattivi senza alcuna configurazione per-VM. |
 | **Profili VM** | Classificazione XML (IOIntensive / AppServer) | Configurazione uniforme per tutte le VM | Permette la coesistenza sicura di carichi eterogenei: ballooning disabilitato e pinning NUMA per i DB, ballooning attivo per aumentare la densità di consolidamento delle VM applicative. |
 | **Monitoring** | Metriche di latenza e coda (steal time, await, fq_codel backlog) | Utilizzo percentuale generico (CPU%, RAM%) | Le metriche di saturazione percentuale non intercettano la contesa di risorse in un sistema virtualizzato. Solo le metriche di coda e latenza permettono di identificare i colli di bottiglia prima che impattino i clienti. |
+| **Policy Live Migration** | `resource-stickiness=1000` + Negative Score Watcher (-1500) | Migrazione automatica su qualsiasi variazione di carico | Previene l'effetto ping-pong: la VM migra solo sotto overload confermato (3 check consecutivi) e rimane stabile sul nodo di destinazione grazie alla stickiness, anche dopo il rientro dell'allarme sul nodo di origine. |
 
 
 
