@@ -8,7 +8,6 @@
 # Progetto: KvirtIO Virtualization
 # ==============================================================================
 
-#TODO - RIFARE XML ORA CONTIENE IL VINCOLO NUMA DA MIGRARE VERSO DINAMICO COME DA HLD
 
 
 set -o nounset
@@ -138,15 +137,21 @@ RAM_KIB=$(( RAM_GB * 1024 * 1024 ))
 if [ "$PROFILE_LC" = "iointensive" ]; then
     # PROFILO IOINTENSIVE: hugepages 1GB, virtio-scsi multiqueue, cache=none io=native
     DISK_DRIVER_OPTS="cache='none' io='native' discard='unmap'"
-    MEMORY_BACKING="<memoryBacking><hugepages><page size='1048576' unit='KiB'/></hugepages><locked/></memoryBacking>"
+    # RIMOSSO --> MEMORY_BACKING="<memoryBacking><hugepages><page size='1048576' unit='KiB'/></hugepages><locked/></memoryBacking>"
     DISK_BUS="scsi"
     DISK_CONTROLLER="<controller type='scsi' index='0' model='virtio-scsi'><driver queues='${VCPU}' iothread='1'/></controller>"
+    NUMATUNE="<numatune><memory mode='strict' placement='auto'/></numatune>"
+    MEMBALLOON="<memballoon model='none'/>"
+    VCPU_PLACEMENT="auto"
 else
     # PROFILO GENERAL: nessuna hugepage, virtio standard
     DISK_DRIVER_OPTS="cache='writeback'"
     MEMORY_BACKING=""
     DISK_BUS="virtio"
     DISK_CONTROLLER=""
+    NUMATUNE=""
+    MEMBALLOON="<memballoon model='virtio'><stats period='10'/></memballoon>"
+    VCPU_PLACEMENT="auto"
 fi
 
 # Costruisce il documento XML della VM
@@ -156,8 +161,9 @@ VM_XML=$(cat <<XMLEOF
   <uuid>$(uuidgen 2>/dev/null || cat /proc/sys/kernel/random/uuid)</uuid>
   <memory unit='KiB'>${RAM_KIB}</memory>
   <currentMemory unit='KiB'>${RAM_KIB}</currentMemory>
-  ${MEMORY_BACKING}
-  <vcpu placement='static'>${VCPU}</vcpu>
+  ${MEMBALLOON}
+  <vcpu placement='${VCPU_PLACEMENT}'>${VCPU}</vcpu>
+  ${NUMATUNE}
   <os>
     <type arch='x86_64' machine='q35'>hvm</type>
     <boot dev='hd'/>
@@ -186,7 +192,6 @@ VM_XML=$(cat <<XMLEOF
       <target type='virtio' name='org.qemu.guest_agent.0'/>
     </channel>
     <video><model type='vga' vram='16384' heads='1'/></video>
-    <memballoon model='virtio'/>
   </devices>
   <metadata>
     <kvirtio:profile xmlns:kvirtio='http://kvirtio.local/metadata'>${PROFILE_LC}</kvirtio:profile>

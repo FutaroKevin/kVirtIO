@@ -404,7 +404,7 @@ crm configure location loc_vm_db01 vm_db01 \
 L'isteresi si risolve secondo questa matrice di punteggio:
 
 *   **Stato Nominale**: La VM gira sul Nodo 1. Ha un valore di preferenza base più la sua `resource-stickiness` (+1000). Il cluster non la muove.
-*   **Stato di Overload**: Il watcher rileva la saturazione e controlla `status-load="overloaded"`. Pacemaker applica il vincolo di -1500. Il punteggio del Nodo 1 crolla a $-500$ ($1000 - 1500$). Poiché un qualsiasi altro nodo vuoto ha un punteggio di $0$, Pacemaker avvia istantaneamente la Live Migration verso l'host più scarico.
+*   **Stato di Overload**: Il watcher rileva la saturazione e imposta `status-load="overloaded"`. Pacemaker applica il vincolo di -1500. Il punteggio del Nodo 1 crolla a $-500$ ($1000 - 1500$). Poiché un qualsiasi altro nodo vuoto ha un punteggio di $0$, Pacemaker avvia istantaneamente la Live Migration verso l'host più scarico.
 *   **Rientro dell'Allarme**: Una volta evacuata la VM, il carico sul Nodo 1 scende e il watcher lo reimposta su `healthy`. La VM si trova ora sul Nodo 2, protetta dalla sua nuova `resource-stickiness` di +1000 sul Nodo 2. Nonostante il Nodo 1 sia tornato sano (punteggio 0), la VM rimane stabilmente sul Nodo 2, poiché $1000 > 0$. Questo azzera i micro-spostamenti e stabilizza l'infrastruttura.
 
 #### 4.4.2 Tolleranza ai Guasti Locali (Migration Threshold)
