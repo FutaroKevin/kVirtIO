@@ -642,8 +642,8 @@ Il nodo di Management ospita il servizio **Websockify** abbinato al client HTML5
           ▼
   ┌──────────────────────────────────────────┐
   │  KVM Node X (SLES Hypervisor)            │
-  │  QEMU listens on 0.0.0.0:590Y           │
-  │  Firewall: accetta solo da MGT Server   │
+  │  QEMU listens on 0.0.0.0:590Y            │
+  │  Firewall: accetta solo da MGT Server    │
   └──────────────────────────────────────────┘
 ```
 
