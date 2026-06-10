@@ -81,14 +81,12 @@ Sul Server di Management esterno:
         ```
 
 3.  **Posizionamento degli script**:
-    *   Copiare lo script [kvirtio-host-watcher.sh](../scripts/kvirtio-host-watcher.sh) in `/usr/local/bin/kvirtio-host-watcher.sh`.
-    *   Copiare lo script [kvirtio-io-watcher.sh](../scripts/kvirtio-io-watcher.sh) in `/usr/local/bin/kvirtio-io-watcher.sh`.
+    *   Copiare gli script [kvirtio-*](../scripts/kvirtio-*) in `/usr/local/bin/kvirtio-*`.
     *   Assegnare i permessi di esecuzione:
         ```bash
-        sudo chmod +x /usr/local/bin/kvirtio-host-watcher.sh
-        sudo chmod +x /usr/local/bin/kvirtio-io-watcher.sh
-        sudo chown kvirtwatch:kvirtwatch /usr/local/bin/kvirtio-host-watcher.sh
-        sudo chown kvirtwatch:kvirtwatch /usr/local/bin/kvirtio-io-watcher.sh
+        sudo cp script/kvirtio-* /usr/local/bin/
+        sudo chmod +x /usr/local/bin/kvirtio-*
+        sudo chown kvirtwatch:kvirtwatch /usr/local/bin/kvirtio-*
         ```
 
 4.  **Configurazione dei Servizi Systemd**:
@@ -103,13 +101,15 @@ Sul Server di Management esterno:
         ```
 
 5.  **Abilitazione e Avvio dei Timer**:
-    *   Abilitare e avviare il timer per il monitoraggio host:
+    *   Abilitare e avviare i timer systemd per scheduler e watcher:
         ```bash
-        sudo systemctl enable --now kvirtio-host-watcher.timer
+        sudo systemctl enable --now kvirtio-*.timer
         ```
-    *   Abilitare e avviare il timer per il monitoraggio I/O:
+
+6.  **Abilitazione e Avvio dei Servizi**:
+    *   Abilitare e avviare i servizi systemd per scheduler e watcher:
         ```bash
-        sudo systemctl enable --now kvirtio-io-watcher.timer
+        sudo systemctl enable --now kvirtio-*.service
         ```
 
 ---
@@ -125,8 +125,8 @@ systemctl list-timers --all | grep kvirtio
 ### Esecuzione di Test Manuale
 È possibile forzare l'esecuzione dei servizi per convalidare il caricamento delle configurazioni ed escludere errori di sintassi:
 ```bash
-sudo systemctl start kvirtio-host-watcher.service
-sudo systemctl start kvirtio-io-watcher.service
+sudo systemctl start kvirtio-*.service
+sudo systemctl start kvirtio-*.service
 ```
 
 ### Ispezione Log Multi-Cluster
