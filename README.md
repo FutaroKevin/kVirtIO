@@ -40,3 +40,6 @@ These scripts reside on the external management server and query the KVM nodes v
 * 📘 **[I/O Watcher Service Detail](docs/kvirtio-io-watcher-service.md)**: Analysis of the `await` metrics extracted via `iostat`.
 * 📘 **[HTML Generator Service Detail](docs/kvirtio-html-generator-service.md)**: Infrastructure status monitoring page.
 * 📘 **[Alerter Detail](docs/kvirtio-mail-alerter.md)**: Detail of the email alerting system.
+
+### Example monitoring UI
+![image info](ui-sample.png)

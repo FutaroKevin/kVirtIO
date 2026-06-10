@@ -549,3 +549,206 @@ In un ambiente senza swap, la memoria è una risorsa binaria: disponibile o esau
 | :--- | :--- | :--- |
 | `host_hugepages_free` | Avvicinarsi a 0 | Metrica di "rischio blocco" per il cluster: se le Hugepages da 1GB si esauriscono, le nuove VM IOIntensive non possono avviarsi. Richiede azione preventiva di bilanciamento del carico. |
 | `guest_balloon_actual` vs `guest_balloon_target` | `actual` << `target` in modo costante | Per le VM "AppServer" con ballooning attivo: la VM è sotto pressione di memoria e potrebbe stare effettuando swap interno al guest. Indicatore precoce di necessità di migrazione o riallocazione. |
+
+---
+
+## 10. Remote Console Management (noVNC) & Live Migration
+
+L'accesso alla console delle macchine virtuali è un requisito critico per l'amministrazione out-of-band da parte degli amministratori di sistema. Poiché KvirtIO utilizza la live migration orchestrata da Pacemaker, l'IP dell'host fisico e la porta VNC esposta da QEMU cambiano dinamicamente ad ogni spostamento della VM. L'architettura risolve il problema combinando tre livelli distinti: un XML agnostico, una configurazione centralizzata del demone libvirt, e un proxy WebSocket basato su token con auto-riconnessione.
+
+### 10.1 Astrazione VNC nell'XML e Blindaggio di Rete
+
+Il principio fondamentale è la **separazione tra la definizione della risorsa e la sua politica di sicurezza**. L'XML della VM non deve mai contenere riferimenti statici all'IP dell'host fisico: tale informazione cambierebbe ad ogni migrazione, rendendo la definizione non portabile e causando il fallimento del bind QEMU sul nodo di destinazione (che non possiede quell'indirizzo IP).
+
+#### 10.1.1 Configurazione XML Agnostica (VM)
+
+L'XML di ogni VM richiede esclusivamente l'allocazione dinamica della porta VNC, senza alcun `listen` esplicito:
+
+```xml
+<devices>
+  <graphics type='vnc' port='-1' autoport='yes' keymap='it'/>
+  <video>
+    <model type='vga' vram='16384' heads='1' primary='yes'/>
+  </video>
+</devices>
+```
+
+> **Motivazione**: `port='-1'` e `autoport='yes'` delegano a QEMU la scelta della prima porta disponibile nel range 5900-6900. Non essendoci un `listen` statico nell'XML, QEMU usa il valore globale definito in `qemu.conf` sul nodo corrente, che è corretto qualunque sia il nodo su cui la VM è in esecuzione.
+
+#### 10.1.2 Configurazione Libvirt a Livello di Host (qemu.conf)
+
+Su **ogni nodo KVM del cluster**, il file `/etc/libvirt/qemu.conf` viene configurato per forzare l'ascolto del VNC sull'interfaccia di Management del nodo specifico. In questo modo il bind QEMU è sempre valido, indipendentemente da quale VM è presente:
+
+```ini
+# /etc/libvirt/qemu.conf
+# Istruzione a QEMU di esporre VNC su tutte le interfacce (filtraggio demandato al firewall)
+# Alternativa preferita: specificare l'IP della VLAN di Management per una difesa in profondità
+vnc_listen = "0.0.0.0"
+vnc_auto_unix_socket = 0
+```
+
+Dopo ogni modifica, il servizio deve essere riavviato: `systemctl restart libvirtd`.
+
+#### 10.1.3 Blindaggio Firewall (Defense-in-Depth su SLES)
+
+Il secondo livello di sicurezza è implementato tramite `firewalld` su ogni nodo KVM. Viene applicata una politica **drop-all** sul range VNC, con whitelist esplicita dei soli IP del cluster di Management (dove risiede il proxy websockify):
+
+```bash
+# Eseguire su ogni nodo KVM del cluster (IP_MGT_NODE_1/2 = IP Management Server)
+firewall-cmd --permanent --zone=public --add-rich-rule='
+  rule family="ipv4"
+  source address="[IP_MGT_NODE_1]"
+  port port="5900-6900" protocol="tcp"
+  accept'
+
+firewall-cmd --permanent --zone=public --add-rich-rule='
+  rule family="ipv4"
+  source address="[IP_MGT_NODE_2]"
+  port port="5900-6900" protocol="tcp"
+  accept'
+
+# Nega il resto (drop implicito nella rich-rule chain)
+firewall-cmd --permanent --zone=public --add-rich-rule='
+  rule family="ipv4"
+  port port="5900-6900" protocol="tcp"
+  drop'
+
+firewall-cmd --reload
+```
+
+Questo garantisce che le porte VNC siano **fisicamente irraggiungibili** da qualsiasi host che non sia il Management Server, anche in caso di errore di configurazione a livello applicativo.
+
+---
+
+### 10.2 Architettura del Proxy Centrale (Management Server)
+
+Il nodo di Management ospita il servizio **Websockify** abbinato al client HTML5 **noVNC**. Il server di Management funge da ponte (bridge) tra l'utente finale (su HTTPS/WSS) e le porte VNC interne dei nodi KVM, accessibili esclusivamente dal proxy grazie alle regole firewall della sezione 10.1.3.
+
+```
+  Browser Amministratore
+        │
+        │  wss://console.kvirtio.local/?token=NOME_VM
+        ▼
+  ┌─────────────────────────────────────────┐
+  │  Management Server                      │
+  │                                         │
+  │  [Apache + noVNC (HTML5)]               │
+  │       │                                 │
+  │  [Websockify + Token Directory]         │
+  │       │   token lookup: NOME_VM         │
+  │       │   → IP_KVM_NODE_X:590Y          │
+  └───────┼─────────────────────────────────┘
+          │  TCP:590Y (VLAN Management)
+          ▼
+  ┌──────────────────────────────────────────┐
+  │  KVM Node X (SLES Hypervisor)            │
+  │  QEMU listens on 0.0.0.0:590Y            │
+  │  Firewall: accetta solo da MGT Server    │
+  └──────────────────────────────────────────┘
+```
+
+Il disaccoppiamento tra la connessione dell'utente e il nodo fisico avviene tramite il meccanismo di **Token Directory** di websockify:
+
+*   Il client web invia una richiesta con `?token=NOME_VM` (es. `vm-oracle-db-01`).
+*   Websockify consulta il proprio file di token (es. `/var/lib/kvirtio/novnc/tokens/cluster1.conf`) per risolvere il nome logico nella destinazione fisica corrente (`IP_NODO_X:PORTA_VNC`).
+*   Il contenuto del file token viene aggiornato dinamicamente dal demone `kvirtio-console-tracker` (sezione 10.3).
+
+**Installazione di websockify e noVNC sul Management Server:**
+
+```bash
+# Installazione delle dipendenze
+zypper install python3-websockify
+
+# Download noVNC (client HTML5)
+cd /var/www/html
+git clone https://github.com/novnc/noVNC.git novnc
+
+# Avvio di websockify con Token Directory
+websockify --web /var/www/html/novnc \
+           --token-plugin TokenFile \
+           --token-source /var/lib/kvirtio/novnc/tokens/cluster1.conf \
+           6080 &
+```
+
+---
+
+### 10.3 Il Demone Console Tracker (kvirtio-console-tracker)
+
+Per mantenere allineata la Token Directory di websockify con la realtà del cluster (VM che migrano, si avviano o si fermano), viene implementato il demone **`kvirtio-console-tracker`** sul nodo di Management.
+
+#### 10.3.1 Funzionamento
+
+Il demone opera secondo il seguente ciclo:
+
+1.  **Lettura configurazione**: Per ogni cluster definito in `/etc/kvirtio/clusters/*.conf`, legge la lista dei nodi KVM.
+2.  **Interrogazione remota**: Via SSH (con utente `kvirtio-watcher` e sudo ristretto), esegue `virsh list --state-running --name` su ogni nodo per ottenere le VM in esecuzione.
+3.  **Recupero porta VNC**: Per ogni VM, esegue `virsh domdisplay <NOME_VM>` per ottenere l'URL VNC corrente (es. `vnc://10.0.1.5:5901`).
+4.  **Aggiornamento atomico token**: Scrive il file token con sostituzione atomica (`mv`) per evitare stati inconsistenti durante l'aggiornamento, con il formato atteso da websockify:
+    ```
+    vm-oracle-db-01: 10.0.1.5:5901
+    vm-sap-app-01: 10.0.1.6:5900
+    ```
+5.  **Aggiornamento JSON Dashboard**: Scrive contestualmente il file `/var/www/html/kvirtio/data/console_<cluster>.json` con le informazioni di console per il dashboard web.
+
+Il polling viene eseguito ogni 10 secondi (configurabile), garantendo una latenza massima di aggiornamento compatibile con i tempi di live migration di Pacemaker.
+
+#### 10.3.2 Flusso durante una Live Migration
+
+```
+Stato Iniziale:
+  Token file: vm-oracle-db-01: 10.0.1.5:5900
+  Utente connesso via noVNC al Nodo 1, porta 5900
+
+Migrazione avviata da Pacemaker (Nodo 1 → Nodo 2):
+  └─ QEMU alloca porta libera sul Nodo 2: es. 5901
+
+Console Tracker (ciclo successivo, entro 10s):
+  └─ virsh domdisplay vm-oracle-db-01 su Nodo 2 → vnc://10.0.1.6:5901
+  └─ Sovrascrive token: vm-oracle-db-01: 10.0.1.6:5901
+
+Client noVNC:
+  └─ La migrazione causa il drop temporaneo del socket VNC
+  └─ noVNC entra in modalità "reconnecting"
+  └─ Al riconnect, websockify legge il nuovo token → Nodo 2:5901
+  └─ La console è ripristinata trasparentemente
+```
+
+#### 10.3.3 Integrazione Systemd
+
+Il demone è gestito come servizio systemd di tipo `simple` con politica di riavvio automatico:
+
+```bash
+# Deploy del demone
+cp scripts/kvirtio-console-tracker.sh /usr/local/sbin/
+chmod 750 /usr/local/sbin/kvirtio-console-tracker.sh
+
+# Installazione del service
+cp systemd/kvirtio-console-tracker.service /etc/systemd/system/
+systemctl daemon-reload
+systemctl enable --now kvirtio-console-tracker.service
+
+# Verifica
+systemctl status kvirtio-console-tracker.service
+journalctl -fu kvirtio-console-tracker.service
+```
+
+---
+
+### 10.4 Configurazione sudoers per Console Tracker
+
+Per rispettare il principio di minimo privilegio, l'utente `kvirtio-watcher` deve avere accesso solo ai comandi `virsh` necessari per il tracker, sui nodi KVM:
+
+
+---
+
+### 10.5 Matrice dei Componenti noVNC
+
+| Componente | Host | Ruolo |
+| :--- | :--- | :--- |
+| **noVNC** (HTML5 client) | Management Server | Client WebSocket/VNC servito da Apache |
+| **Websockify** | Management Server | Proxy TCP-su-WebSocket con risoluzione token |
+| **Token Directory** (`*.conf`) | Management Server | Mapping `NOME_VM → IP_KVM:PORTA` aggiornato dinamicamente |
+| **kvirtio-console-tracker** | Management Server | Demone che mantiene allineato il Token Directory |
+| **qemu.conf** (`vnc_listen`) | Ogni nodo KVM | Forza il bind VNC su tutte le interfacce (o solo Management) |
+| **firewalld** (rich-rules) | Ogni nodo KVM | Limita l'accesso VNC al solo Management Server |
+| **XML VM** (agnostico) | Definizione libvirt | `port='-1' autoport='yes'` senza IP statico |

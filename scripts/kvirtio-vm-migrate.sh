@@ -122,7 +122,7 @@ done
 log "INFO" "Verifica stato della VM '${VM_NAME}' sul nodo sorgente '${FROM_NODE}'..."
 
 VM_STATE=$(ssh $SSH_OPTS "${SSH_USER}@${FROM_NODE}" \
-    "virsh domstate '${VM_NAME}' 2>/dev/null" | tr -d '[:space:]')
+    "sudo virsh domstate '${VM_NAME}' 2>/dev/null" | tr -d '[:space:]')
 
 if [ -z "$VM_STATE" ]; then
     log "ERROR" "Impossibile recuperare lo stato della VM '${VM_NAME}' su ${FROM_NODE}. VM non trovata o nodo irraggiungibile."
@@ -138,7 +138,7 @@ log "INFO" "VM '${VM_NAME}' verificata in stato 'running' su '${FROM_NODE}'."
 
 # Verifica raggiungibilita' del nodo di destinazione
 log "INFO" "Verifica raggiungibilita' del nodo di destinazione '${TO_NODE}'..."
-if ! ssh $SSH_OPTS "${SSH_USER}@${TO_NODE}" "virsh version --daemon > /dev/null 2>&1"; then
+if ! ssh $SSH_OPTS "${SSH_USER}@${TO_NODE}" "sudo virsh version --daemon > /dev/null 2>&1"; then
     log "ERROR" "Il nodo di destinazione '${TO_NODE}' non e' raggiungibile o libvirtd non e' operativo."
     exit 1
 fi
@@ -174,7 +174,7 @@ START_TS=$(date +%s)
 # Tutta l'operazione e' orchestrata dal management server senza
 # che l'amministratore acceda mai direttamente all'hypervisor.
 MIGRATE_OUTPUT=$(ssh $SSH_OPTS "${SSH_USER}@${FROM_NODE}" \
-    "timeout ${TIMEOUT} virsh migrate ${MIGRATE_FLAGS} '${VM_NAME}' '${DEST_URI}'" 2>&1)
+    "timeout ${TIMEOUT} sudo virsh migrate ${MIGRATE_FLAGS} '${VM_NAME}' '${DEST_URI}'" 2>&1)
 MIGRATE_EXIT=$?
 
 END_TS=$(date +%s)
@@ -207,7 +207,7 @@ log "INFO" "Verifica stato post-migrazione su '${TO_NODE}'..."
 sleep 2
 
 NEW_STATE=$(ssh $SSH_OPTS "${SSH_USER}@${TO_NODE}" \
-    "virsh domstate '${VM_NAME}' 2>/dev/null" | tr -d '[:space:]')
+    "sudo virsh domstate '${VM_NAME}' 2>/dev/null" | tr -d '[:space:]')
 
 if [ "$NEW_STATE" = "running" ]; then
     log "INFO" "======================================================"

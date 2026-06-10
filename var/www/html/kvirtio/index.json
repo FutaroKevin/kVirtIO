@@ -1,0 +1,15 @@
+{
+  "generated_at": "2026-06-10T14:00:00",
+  "files": [
+    "host_cluster1_node1.json",
+    "host_cluster1_node2.json",
+    "host_cluster1_node3.json",
+    "io_cluster1_node1.json",
+    "io_cluster1_node2.json",
+    "network_cluster1_node1.json",
+    "network_cluster1_node2.json",
+    "network_cluster1_node3.json",
+    "cluster_cluster1.json",
+    "vm_cluster1.json"
+  ]
+}

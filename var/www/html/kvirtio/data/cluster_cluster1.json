@@ -1,0 +1,22 @@
+{
+  "type": "cluster",
+  "cluster_name": "cluster1",
+  "timestamp": "2026-06-10T14:00:15",
+  "quorum": "present",
+  "total_nodes": 3,
+  "online_nodes": 3,
+  "offline_nodes": 0,
+  "stonith_enabled": true,
+  "resources": {
+    "total": 44,
+    "started": 42,
+    "stopped": 1,
+    "failed": 1
+  },
+  "nodes": [
+    { "name": "kvm-node1.cluster1.local", "state": "online", "role": "member", "standby": false },
+    { "name": "kvm-node2.cluster1.local", "state": "online", "role": "member", "standby": false },
+    { "name": "kvm-node3.cluster1.local", "state": "online", "role": "member", "standby": false }
+  ],
+  "corosync_ring_errors": 0
+}

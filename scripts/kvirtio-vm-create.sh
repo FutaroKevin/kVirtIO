@@ -210,7 +210,7 @@ log "INFO" "Invio della definizione XML della VM al nodo ${TARGET_NODE}..."
 DEFINE_OUTPUT=$(echo "$VM_XML" | ssh $SSH_OPTS "${SSH_USER}@${TARGET_NODE}" "
     TMP_XML=\$(mktemp /tmp/kvirtio_vm_XXXXXX.xml)
     cat > \"\$TMP_XML\"
-    virsh define \"\$TMP_XML\"
+    sudo virsh define \"\$TMP_XML\"
     RETCODE=\$?
     rm -f \"\$TMP_XML\"
     exit \$RETCODE
@@ -236,7 +236,7 @@ log "INFO" "VM '${VM_NAME}' definita con successo su ${TARGET_NODE}."
 
 # Avvio automatico della VM
 log "INFO" "Avvio della VM '${VM_NAME}'..."
-START_OUTPUT=$(ssh $SSH_OPTS "${SSH_USER}@${TARGET_NODE}" "virsh start '${VM_NAME}'" 2>&1)
+START_OUTPUT=$(ssh $SSH_OPTS "${SSH_USER}@${TARGET_NODE}" "sudo virsh start '${VM_NAME}'" 2>&1)
 START_EXIT=$?
 
 if [ "$START_EXIT" -ne 0 ]; then
@@ -245,7 +245,7 @@ if [ "$START_EXIT" -ne 0 ]; then
 fi
 
 # Abilita l'avvio automatico al boot del nodo (autostart)
-ssh $SSH_OPTS "${SSH_USER}@${TARGET_NODE}" "virsh autostart '${VM_NAME}'" 2>/dev/null
+ssh $SSH_OPTS "${SSH_USER}@${TARGET_NODE}" "sudo virsh autostart '${VM_NAME}'" 2>/dev/null
 
 log "INFO" "====================================================="
 log "INFO" "VM '${VM_NAME}' creata e avviata con successo."

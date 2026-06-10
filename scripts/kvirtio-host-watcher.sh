@@ -144,5 +144,22 @@ for config in "${CONFIG_FILES[@]}"; do
 COUNT=${COUNT}
 STATUS="${STATUS}"
 EOF
+
+        # Esporta JSON per il frontend
+        DATA_DIR="/var/www/html/kvirtio/data"
+        mkdir -p "$DATA_DIR" 2>/dev/null || true
+        cat <<EOF > "${DATA_DIR}/host_${CLUSTER_NAME}_${node}.json"
+{
+  "generated_at": "$(date -u +"%Y-%m-%dT%H:%M:%S")",
+  "cluster_name": "${CLUSTER_NAME}",
+  "node": "${node}",
+  "status_ha": "${STATUS}",
+  "metrics": {
+    "steal_permille": ${steal_permille},
+    "hugepages_total": ${hp_total},
+    "hugepages_free": ${hp_free}
+  }
+}
+EOF
     done
 done

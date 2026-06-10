@@ -118,7 +118,9 @@ process_node() {
     local cluster_name="$1"
     local node="$2"
 
-    local state_file="/tmp/kvirtio_multipath_state_${cluster_name}_${node}.json"
+    local data_dir="/var/www/html/kvirtio/data"
+    mkdir -p "${data_dir}" 2>/dev/null || true
+    local state_file="${data_dir}/multipath_${cluster_name}_${node}.json"
     local prev_state_file="/tmp/kvirtio_multipath_prev_state_${cluster_name}_${node}"
 
     local mp_output

@@ -43,4 +43,5 @@ Questi script risiedono sul server di management esterno ed interrogano i nodi K
 *   📘 **[Dettaglio HTML Generator Service](docs/kvirtio-html-generator-service.md)**: Pagina di monitoraggio dello stato dell'infrastruttura.
 *   📘 **[Dettaglio Alerter](docs/kvirtio-mail-alerter.md)**: Dettaglio sistema di alerting tramite mail.
 
-
+### Esempio interfaccia di monitoraggio
+![image info](ui-sample.png)

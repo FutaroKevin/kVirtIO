@@ -1,0 +1,22 @@
+{
+  "type": "network",
+  "cluster_name": "cluster1",
+  "node": "kvm-node1.cluster1.local",
+  "timestamp": "2026-06-10T14:00:03",
+  "status": "healthy",
+  "bond": "bond0",
+  "bond_mode": "802.3ad (LACP)",
+  "bond_mtu": 9000,
+  "slaves": [
+    { "iface": "eth0", "state": "up", "speed_gbps": 25, "rx_errors": 0, "tx_errors": 0 },
+    { "iface": "eth1", "state": "up", "speed_gbps": 25, "rx_errors": 0, "tx_errors": 0 }
+  ],
+  "metrics": {
+    "throughput_rx_gbps": 8.4,
+    "throughput_tx_gbps": 12.7,
+    "packet_drop_rx": 0,
+    "packet_drop_tx": 0,
+    "fq_codel_backlog_bytes": 14200,
+    "mtu_mismatch_count": 0
+  }
+}
