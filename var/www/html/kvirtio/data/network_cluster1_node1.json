@@ -1,0 +1,11 @@
+{
+  "generated_at": "2026-06-10T08:00:00",
+  "cluster_name": "cluster1",
+  "node": "node1",
+  "bond": "bond0",
+  "active_slaves": ["eth0", "eth1"],
+  "degraded_slaves": [],
+  "status": "UP",
+  "rx_mbps": 312.4,
+  "tx_mbps": 187.9
+}

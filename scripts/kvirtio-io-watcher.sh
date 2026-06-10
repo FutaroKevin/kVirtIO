@@ -97,5 +97,20 @@ for config in "${CONFIG_FILES[@]}"; do
         if [ "$is_util_high" -eq 1 ]; then
             logger -t KvirtIO-IO "WARNING: [$CLUSTER_NAME] Saturazione Coda I/O sul nodo ${node}. Utilizzo max LUN: ${max_util}% (Soglia: 95%). Rischio hotspot."
         fi
+
+        # Esporta JSON per il frontend
+        DATA_DIR="/var/www/html/kvirtio/data"
+        mkdir -p "$DATA_DIR" 2>/dev/null || true
+        cat <<EOF > "${DATA_DIR}/io_${CLUSTER_NAME}_${node}.json"
+{
+  "generated_at": "$(date -u +"%Y-%m-%dT%H:%M:%S")",
+  "cluster_name": "${CLUSTER_NAME}",
+  "node": "${node}",
+  "metrics": {
+    "max_await_ms": ${max_await},
+    "max_util_percent": ${max_util}
+  }
+}
+EOF
     done
 done

@@ -1,0 +1,11 @@
+{
+  "generated_at": "2026-06-10T08:00:00",
+  "cluster_name": "cluster1",
+  "node": "node1",
+  "status_ha": "online",
+  "metrics": {
+    "steal_permille": 2,
+    "hugepages_total": 512,
+    "hugepages_free": 128
+  }
+}

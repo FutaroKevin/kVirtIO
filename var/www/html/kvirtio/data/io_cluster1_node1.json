@@ -1,0 +1,9 @@
+{
+  "generated_at": "2026-06-10T08:00:00",
+  "cluster_name": "cluster1",
+  "node": "node1",
+  "metrics": {
+    "max_await_ms": 4.7,
+    "max_util_percent": 23.5
+  }
+}

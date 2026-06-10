@@ -152,7 +152,9 @@ process_node() {
     local node="$2"
     local bond_iface="$3"
 
-    local state_file="/tmp/kvirtio_network_state_${cluster_name}_${node}.json"
+    local data_dir="/var/www/html/kvirtio/data"
+    mkdir -p "${data_dir}" 2>/dev/null || true
+    local state_file="${data_dir}/network_${cluster_name}_${node}.json"
     local prev_state_file="/tmp/kvirtio_network_prev_state_${cluster_name}_${node}"
 
     # Leggi bonding info

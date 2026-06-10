@@ -1,0 +1,18 @@
+{
+  "generated_at": "2026-06-10T08:00:00",
+  "cluster_name": "cluster1",
+  "quorum": "OK",
+  "expected_votes": 3,
+  "actual_votes": 3,
+  "nodes": [
+    { "name": "node1", "status": "online", "votes": 1 },
+    { "name": "node2", "status": "online", "votes": 1 },
+    { "name": "node3", "status": "online", "votes": 1 }
+  ],
+  "failed_resources": [],
+  "stonith_agents": [
+    { "name": "fence_node1", "type": "fence_ipmilan", "target": "node1" },
+    { "name": "fence_node2", "type": "fence_ipmilan", "target": "node2" },
+    { "name": "fence_node3", "type": "fence_ipmilan", "target": "node3" }
+  ]
+}

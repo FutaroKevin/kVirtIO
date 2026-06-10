@@ -1,0 +1,30 @@
+{
+  "generated_at": "2026-06-10T08:00:00",
+  "cluster_name": "cluster1",
+  "vms": [
+    {
+      "name": "vm-web-01",
+      "id": "101",
+      "status": "running",
+      "node": "node1",
+      "vcpus": 4,
+      "memory_mb": 8192
+    },
+    {
+      "name": "vm-db-01",
+      "id": "102",
+      "status": "running",
+      "node": "node2",
+      "vcpus": 8,
+      "memory_mb": 16384
+    },
+    {
+      "name": "vm-backup-01",
+      "id": "103",
+      "status": "stopped",
+      "node": "node3",
+      "vcpus": 2,
+      "memory_mb": 4096
+    }
+  ]
+}
