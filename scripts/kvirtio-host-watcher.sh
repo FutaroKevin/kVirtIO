@@ -64,31 +64,30 @@ for config in "${CONFIG_FILES[@]}"; do
 
         # Recupera metriche via SSH
         read_stats=$(ssh $SSH_OPTS "${SSH_USER}@${node}" "
-            # CPU (lettura differenziale su /proc/stat)
+            # CPU Steal (lettura differenziale su /proc/stat)
             read -r _ user nice system idle iowait irq softirq steal _ < /proc/stat
-            prev_idle=\$((idle + iowait))
-            prev_non_idle=\$((user + nice + system + irq + softirq + steal))
-            prev_total=\$((prev_idle + prev_non_idle))
+            prev_total=\$((user + nice + system + idle + iowait + irq + softirq + steal))
+            prev_steal=\$steal
             sleep 0.5
             read -r _ user nice system idle iowait irq softirq steal _ < /proc/stat
-            idle=\$((idle + iowait))
-            non_idle=\$((user + nice + system + irq + softirq + steal))
-            total=\$((idle + non_idle))
+            total=\$((user + nice + system + idle + iowait + irq + softirq + steal))
             total_d=\$((total - prev_total))
-            idle_d=\$((idle - prev_idle))
+            steal_d=\$((steal - prev_steal))
+            
             if [ \$total_d -gt 0 ]; then
-                cpu_usage=\$(( (total_d - idle_d) * 100 / total_d ))
+                # Calcola il per mille per avere precisione allo 0.1% con interi
+                steal_permille=\$(( (steal_d * 1000) / total_d ))
             else
-                cpu_usage=0
+                steal_permille=0
             fi
 
-            # RAM (MemAvailable su /proc/meminfo)
-            read -r _ mem_total _ < <(grep MemTotal /proc/meminfo)
-            read -r _ mem_avail _ < <(grep MemAvailable /proc/meminfo)
-            mem_used=\$((mem_total - mem_avail))
-            ram_usage=\$((mem_used * 100 / mem_total))
+            # HugePages_Free da /proc/meminfo
+            hp_total=\$(awk '/HugePages_Total/ {print \$2}' /proc/meminfo)
+            hp_free=\$(awk '/HugePages_Free/ {print \$2}' /proc/meminfo)
+            if [ -z \"\$hp_total\" ]; then hp_total=0; fi
+            if [ -z \"\$hp_free\" ]; then hp_free=0; fi
             
-            echo \"\$cpu_usage \$ram_usage\"
+            echo \"\$steal_permille \$hp_total \$hp_free\"
         " 2>/dev/null)
 
         if [ -z "$read_stats" ]; then
@@ -96,10 +95,22 @@ for config in "${CONFIG_FILES[@]}"; do
             continue
         fi
 
-        read -r cpu_val ram_val <<< "$read_stats"
+        read -r steal_permille hp_total hp_free <<< "$read_stats"
 
-        # Verifica soglie
-        if [ "$cpu_val" -gt "$CPU_THRESHOLD" ] || [ "$ram_val" -gt "$RAM_THRESHOLD" ]; then
+        # Verifica soglie HLD
+        # Soglia Steal Time > 0.1% (ovvero steal_permille > 1)
+        # Soglia HugePages: se hp_total > 0 e hp_free < 5 (rischio blocco)
+        is_overloaded=0
+        reason=""
+        if [ "$steal_permille" -gt 1 ]; then
+            is_overloaded=1
+            reason="StealTime=${steal_permille}‰"
+        elif [ "$hp_total" -gt 0 ] && [ "$hp_free" -lt 5 ]; then
+            is_overloaded=1
+            reason="HugePagesFree=${hp_free}"
+        fi
+
+        if [ "$is_overloaded" -eq 1 ]; then
             COUNT=$((COUNT + 1))
             
             if [ "$COUNT" -ge "$CONSECUTIVE_LIMIT" ]; then
@@ -107,13 +118,13 @@ for config in "${CONFIG_FILES[@]}"; do
                     # Aggiorna attributo su Pacemaker
                     if ssh $SSH_OPTS "${SSH_USER}@${node}" "sudo crm_attribute --node ${node} --name status-load --update 'overloaded'" 2>/dev/null; then
                         STATUS="overloaded"
-                        logger -t KvirtIO-Host "CRITICAL: [$CLUSTER_NAME] Nodo ${node} sovraccarico da ${CONSECUTIVE_LIMIT} controlli (CPU: ${cpu_val}%, RAM: ${ram_val}%). Impostato 'overloaded'."
+                        logger -t KvirtIO-Host "CRITICAL: [$CLUSTER_NAME] Nodo ${node} sovraccarico da ${CONSECUTIVE_LIMIT} controlli (${reason}). Impostato 'overloaded'."
                     else
                         logger -t KvirtIO-Host "ERROR: [$CLUSTER_NAME] Errore esecuzione crm_attribute su ${node}."
                     fi
                 fi
             else
-                logger -t KvirtIO-Host "WARNING: [$CLUSTER_NAME] Picco di carico su ${node} (CPU: ${cpu_val}%, RAM: ${ram_val}%). Consecutivi: ${COUNT}/${CONSECUTIVE_LIMIT}."
+                logger -t KvirtIO-Host "WARNING: [$CLUSTER_NAME] Picco di carico su ${node} (${reason}). Consecutivi: ${COUNT}/${CONSECUTIVE_LIMIT}."
             fi
         else
             COUNT=0
@@ -121,7 +132,7 @@ for config in "${CONFIG_FILES[@]}"; do
                 # Ripristina lo stato healthy
                 if ssh $SSH_OPTS "${SSH_USER}@${node}" "sudo crm_attribute --node ${node} --name status-load --update 'healthy'" 2>/dev/null; then
                     STATUS="healthy"
-                    logger -t KvirtIO-Host "INFO: [$CLUSTER_NAME] Nodo ${node} rientrato nei parametri (CPU: ${cpu_val}%, RAM: ${ram_val}%). Impostato 'healthy'."
+                    logger -t KvirtIO-Host "INFO: [$CLUSTER_NAME] Nodo ${node} rientrato nei parametri (Steal=${steal_permille}‰, HPFree=${hp_free}). Impostato 'healthy'."
                 else
                     logger -t KvirtIO-Host "ERROR: [$CLUSTER_NAME] Errore ripristino crm_attribute su ${node}."
                 fi

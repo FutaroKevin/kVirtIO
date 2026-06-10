@@ -45,13 +45,16 @@ for config in "${CONFIG_FILES[@]}"; do
 
     for node in "${NODES[@]}"; do
         # Esegue iostat sul nodo KVM e processa localmente tramite awk
-        max_await=$(ssh $SSH_OPTS "${SSH_USER}@${node}" "sudo iostat -dx 1 2" 2>/dev/null | awk '
-            BEGIN { report = 0; max_val = 0.0; }
+        read_stats=$(ssh $SSH_OPTS "${SSH_USER}@${node}" "sudo iostat -dx 1 2" 2>/dev/null | awk '
+            BEGIN { report = 0; max_val = 0.0; max_util = 0.0; }
             /^(Device|Device:)/ { 
                 report++; 
                 for (i=1; i<=NF; i++) {
                     if ($i ~ /await/) {
                         await_cols[i] = 1;
+                    }
+                    if ($i == "%util") {
+                        util_col = i;
                     }
                 }
                 next;
@@ -64,19 +67,35 @@ for config in "${CONFIG_FILES[@]}"; do
                         max_val = val + 0;
                     }
                 }
+                if (util_col > 0) {
+                    u_val = $util_col;
+                    gsub(/,/, ".", u_val);
+                    if (u_val + 0 > max_util) {
+                        max_util = u_val + 0;
+                    }
+                }
             }
-            END { print max_val }
+            END { print max_val " " max_util }
         ')
 
-        if [ -z "$max_await" ]; then
+        if [ -z "$read_stats" ]; then
             logger -t KvirtIO-IO "ERROR: [$CLUSTER_NAME] Impossibile raccogliere metriche I/O da ${node}."
             continue
         fi
 
+        read -r max_await max_util <<< "$read_stats"
+        # Imposta a 0 se max_util è vuoto
+        if [ -z "$max_util" ]; then max_util=0; fi
+
         is_above_threshold=$(awk -v val="$max_await" -v thresh="$LATENCY_THRESHOLD" 'BEGIN { print (val > thresh) ? 1 : 0 }')
+        is_util_high=$(awk -v util="$max_util" 'BEGIN { print (util > 95) ? 1 : 0 }')
 
         if [ "$is_above_threshold" -eq 1 ]; then
             logger -t KvirtIO-IO "WARNING: [$CLUSTER_NAME] Latenza I/O anomala sul nodo ${node}. Massimo await riscontrato su multipath: ${max_await}ms (Soglia: ${LATENCY_THRESHOLD}ms)."
+        fi
+        
+        if [ "$is_util_high" -eq 1 ]; then
+            logger -t KvirtIO-IO "WARNING: [$CLUSTER_NAME] Saturazione Coda I/O sul nodo ${node}. Utilizzo max LUN: ${max_util}% (Soglia: 95%). Rischio hotspot."
         fi
     done
 done
