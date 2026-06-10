@@ -8,6 +8,9 @@
 # Progetto: KvirtIO Virtualization
 # ==============================================================================
 
+#TODO - RIFARE XML ORA CONTIENE IL VINCOLO NUMA DA MIGRARE VERSO DINAMICO COME DA HLD
+
+
 set -o nounset
 set -o pipefail
 
