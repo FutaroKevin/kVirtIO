@@ -1,9 +1,18 @@
 {
-  "generated_at": "2026-06-10T08:00:00",
+  "type": "io",
   "cluster_name": "cluster1",
-  "node": "node1",
+  "node": "kvm-node1.cluster1.local",
+  "timestamp": "2026-06-10T14:00:02",
+  "status": "healthy",
   "metrics": {
-    "max_await_ms": 4.7,
-    "max_util_percent": 23.5
-  }
+    "max_await_ms": 4.2,
+    "max_util_percent": 38,
+    "max_svctm_ms": 1.1
+  },
+  "luns": [
+    { "device": "sde", "dm": "dm-4", "await_ms": 4.2, "util_percent": 38, "iops_read": 12400, "iops_write": 8900 },
+    { "device": "sdf", "dm": "dm-5", "await_ms": 3.8, "util_percent": 31, "iops_read": 11100, "iops_write": 7650 },
+    { "device": "sdg", "dm": "dm-6", "await_ms": 2.9, "util_percent": 25, "iops_read": 9800,  "iops_write": 6100 },
+    { "device": "sdh", "dm": "dm-7", "await_ms": 3.5, "util_percent": 29, "iops_read": 10300, "iops_write": 7200 }
+  ]
 }

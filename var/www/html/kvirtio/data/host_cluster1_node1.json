@@ -1,11 +1,22 @@
 {
-  "generated_at": "2026-06-10T08:00:00",
+  "type": "host",
   "cluster_name": "cluster1",
-  "node": "node1",
+  "node": "kvm-node1.cluster1.local",
+  "timestamp": "2026-06-10T14:00:00",
   "status_ha": "online",
   "metrics": {
     "steal_permille": 2,
     "hugepages_total": 512,
-    "hugepages_free": 128
+    "hugepages_free": 378,
+    "hugepages_used": 134,
+    "load_avg_1m": 4.12,
+    "load_avg_5m": 3.87,
+    "load_avg_15m": 3.65,
+    "cpu_cores": 128,
+    "ram_total_gb": 1024,
+    "ram_used_gb": 687,
+    "ram_free_gb": 337,
+    "vm_count": 12,
+    "uptime_days": 47
   }
 }

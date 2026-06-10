@@ -1,0 +1,26 @@
+[Unit]
+Description=KvirtIO Console Tracker - noVNC Token Directory Updater
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/sbin/kvirtio-console-tracker.sh
+Restart=on-failure
+RestartSec=15s
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=KvirtIO-ConsoleTracker
+
+# Esegue come utente dedicato (non root)
+User=kvirtwatch
+Group=kvirtwatch
+
+# Hardening di sicurezza systemd
+ProtectSystem=strict
+ReadWritePaths=/var/lib/kvirtio/novnc/tokens /var/www/html/kvirtio/data
+PrivateTmp=true
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

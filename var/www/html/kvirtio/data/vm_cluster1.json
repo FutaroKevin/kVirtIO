@@ -1,30 +1,111 @@
 {
-  "generated_at": "2026-06-10T08:00:00",
+  "type": "vm",
   "cluster_name": "cluster1",
+  "timestamp": "2026-06-10T14:00:20",
   "vms": [
     {
-      "name": "vm-web-01",
-      "id": "101",
-      "status": "running",
-      "node": "node1",
-      "vcpus": 4,
-      "memory_mb": 8192
+      "name": "vm-oracle-db-01",
+      "profile": "IOIntensive",
+      "libvirt_state": "running",
+      "pacemaker_status": "Started",
+      "pacemaker_node": "kvm-node1.cluster1.local",
+      "vcpus": 32,
+      "ram_gb": 256,
+      "disk_used_gb": 1840,
+      "disk_total_gb": 2048,
+      "vnc_port": 5900,
+      "console_token": "vm-oracle-db-01"
     },
     {
-      "name": "vm-db-01",
-      "id": "102",
-      "status": "running",
-      "node": "node2",
+      "name": "vm-oracle-db-02",
+      "profile": "IOIntensive",
+      "libvirt_state": "running",
+      "pacemaker_status": "Started",
+      "pacemaker_node": "kvm-node1.cluster1.local",
+      "vcpus": 32,
+      "ram_gb": 256,
+      "disk_used_gb": 1640,
+      "disk_total_gb": 2048,
+      "vnc_port": 5901,
+      "console_token": "vm-oracle-db-02"
+    },
+    {
+      "name": "vm-sap-app-01",
+      "profile": "AppServer",
+      "libvirt_state": "running",
+      "pacemaker_status": "Started",
+      "pacemaker_node": "kvm-node2.cluster1.local",
+      "vcpus": 16,
+      "ram_gb": 128,
+      "disk_used_gb": 420,
+      "disk_total_gb": 1024,
+      "vnc_port": 5900,
+      "console_token": "vm-sap-app-01"
+    },
+    {
+      "name": "vm-sap-app-02",
+      "profile": "AppServer",
+      "libvirt_state": "running",
+      "pacemaker_status": "Started",
+      "pacemaker_node": "kvm-node2.cluster1.local",
+      "vcpus": 16,
+      "ram_gb": 128,
+      "disk_used_gb": 390,
+      "disk_total_gb": 1024,
+      "vnc_port": 5901,
+      "console_token": "vm-sap-app-02"
+    },
+    {
+      "name": "vm-mq-broker-01",
+      "profile": "IOIntensive",
+      "libvirt_state": "running",
+      "pacemaker_status": "Started",
+      "pacemaker_node": "kvm-node2.cluster1.local",
       "vcpus": 8,
-      "memory_mb": 16384
+      "ram_gb": 64,
+      "disk_used_gb": 210,
+      "disk_total_gb": 512,
+      "vnc_port": 5902,
+      "console_token": "vm-mq-broker-01"
     },
     {
-      "name": "vm-backup-01",
-      "id": "103",
-      "status": "stopped",
-      "node": "node3",
+      "name": "vm-web-frontend-01",
+      "profile": "AppServer",
+      "libvirt_state": "running",
+      "pacemaker_status": "Started",
+      "pacemaker_node": "kvm-node3.cluster1.local",
+      "vcpus": 4,
+      "ram_gb": 16,
+      "disk_used_gb": 48,
+      "disk_total_gb": 256,
+      "vnc_port": 5900,
+      "console_token": "vm-web-frontend-01"
+    },
+    {
+      "name": "vm-backup-agent-01",
+      "profile": "AppServer",
+      "libvirt_state": "shut off",
+      "pacemaker_status": "Stopped",
+      "pacemaker_node": "kvm-node1.cluster1.local",
+      "vcpus": 4,
+      "ram_gb": 16,
+      "disk_used_gb": 98,
+      "disk_total_gb": 256,
+      "vnc_port": null,
+      "console_token": "vm-backup-agent-01"
+    },
+    {
+      "name": "vm-monitoring-probe",
+      "profile": "AppServer",
+      "libvirt_state": "running",
+      "pacemaker_status": "FAILED",
+      "pacemaker_node": "kvm-node2.cluster1.local",
       "vcpus": 2,
-      "memory_mb": 4096
+      "ram_gb": 8,
+      "disk_used_gb": 22,
+      "disk_total_gb": 128,
+      "vnc_port": 5903,
+      "console_token": "vm-monitoring-probe"
     }
   ]
 }
