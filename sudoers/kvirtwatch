@@ -25,4 +25,6 @@ kvirtwatch ALL=(ALL) NOPASSWD: \
     /usr/bin/virsh start *, \
     /usr/bin/virsh autostart *, \
     /usr/bin/virsh version --daemon, \
-    /usr/bin/virsh migrate *
+    /usr/bin/virsh migrate * \
+    /usr/bin/virsh domdisplay * \
+    /usr/bin/virsh list --state-running --name

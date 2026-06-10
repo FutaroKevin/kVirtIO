@@ -738,11 +738,6 @@ journalctl -fu kvirtio-console-tracker.service
 
 Per rispettare il principio di minimo privilegio, l'utente `kvirtio-watcher` deve avere accesso solo ai comandi `virsh` necessari per il tracker, sui nodi KVM:
 
-```
-# /etc/sudoers.d/kvirtio-console (da distribuire su ogni nodo KVM)
-kvirtio-watcher ALL=(root) NOPASSWD: /usr/bin/virsh list --state-running --name
-kvirtio-watcher ALL=(root) NOPASSWD: /usr/bin/virsh domdisplay *
-```
 
 ---
 
@@ -756,4 +751,4 @@ kvirtio-watcher ALL=(root) NOPASSWD: /usr/bin/virsh domdisplay *
 | **kvirtio-console-tracker** | Management Server | Demone che mantiene allineato il Token Directory |
 | **qemu.conf** (`vnc_listen`) | Ogni nodo KVM | Forza il bind VNC su tutte le interfacce (o solo Management) |
 | **firewalld** (rich-rules) | Ogni nodo KVM | Limita l'accesso VNC al solo Management Server |
-| **XML VM** (agnostico) | Definizione libvirt | `port='-1' autoport='yes'` senza IP statico |
+| **XML VM** (agnostico) | Definizione libvirt | `port='-1' autoport='yes'` senza IP statico |
