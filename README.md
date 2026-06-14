@@ -42,6 +42,7 @@ This project is not intended to be associated to virtIO library
 
 ### 1. Architecture and Design Documents
 * 📄 **[KvirtIO High-Level Design (HLD)](KvirtIO_HLD.md)**: The high-level architecture document.
+* 🔒 **[KvirtIO Security Architecture & Hardening Design (HLD)](KvirtIO_Security_HLD_EN.md)**: Mandatory security baseline, Zero-Trust model and hardening reference for hosts, hypervisor, network, storage and cluster layers.
 
 ### 2. Monitoring, Watchers & Management (External Control Plane)
 These scripts reside on the external management server and query the KVM nodes via SSH using the `kvirtwatch` user.
