@@ -1,75 +1,75 @@
-# Documentazione Sistema di Notifica: KvirtIO Mail Alerter
+# Notification System Documentation: KvirtIO Mail Alerter
 
-Il sistema di notifica **KvirtIO Mail Alerter** consente l'invio asincrono di allarmi e-mail in caso di superamento delle soglie hardware o di problemi sui dischi Fibre Channel dei nodi ipervisori.
-
----
-
-## 📋 Descrizione Funzionale
-Il sistema si basa su uno script Python nativo (`kvirtio-mail-alerter.py`) posizionato sul server di management ed integrato direttamente con i watcher di cluster (`kvirtio-host-watcher.sh` e `kvirtio-io-watcher.sh`). 
-
-Ogni volta che si verifica una transizione di stato critica (es. host sovraccarico per 3 controlli consecutivi o latenza disco superiore a 10ms), lo script viene invocato in background (`&`) per evitare di bloccare il ciclo di monitoraggio principale del watcher in caso di ritardi nella comunicazione con il server SMTP.
+The **KvirtIO Mail Alerter** notification system allows for asynchronous sending of email alerts when hardware thresholds are exceeded or issues arise on Fibre Channel disks of hypervisor nodes.
 
 ---
 
-## ⚙️ Configurazione SMTP (/etc/kvirtio/mail.conf)
-La configurazione SMTP risiede in un file shell-like situato in `/etc/kvirtio/mail.conf` ed ha la seguente struttura:
+## 📋 Functional Description
+The system is based on a native Python script (`kvirtio-mail-alerter.py`) located on the management server and integrated with cluster watchers (`kvirtio-host-watcher.sh` and `kvirtio-io-watcher.sh`).
+
+Whenever a critical state transition occurs (e.g., host overloaded for 3 consecutive checks or disk latency exceeding 10ms), the script is invoked in the background (`&`) to prevent blocking the watcher's main monitoring loop in case of SMTP server communication delays.
+
+---
+
+## ⚙️ SMTP Configuration (/etc/kvirtio/mail.conf)
+SMTP configuration resides in a shell-like file located at `/etc/kvirtio/mail.conf` with the following structure:
 
 ```ini
-# Server SMTP e Porta
+# SMTP Server and Port
 SMTP_SERVER=smtp.example.com
 SMTP_PORT=587
 
-# Abilita STARTTLS (True/False)
+# Enable STARTTLS (True/False)
 SMTP_STARTTLS=True
 
-# Credenziali di Autenticazione (Lasciare vuote se non richiesto login)
+# Authentication Credentials (Leave blank if login is not required)
 SMTP_USER=alerts@kvirtio.local
 SMTP_PASSWORD=secretpassword
 
-# Indirizzi Mittente e Destinatario
+# Sender and Recipient Addresses
 SMTP_FROM=alerts@kvirtio.local
 SMTP_TO=sysadmins@example.com
 ```
 
-### Parametri della Configurazione:
-*   `SMTP_SERVER`: Hostname o IP del server SMTP aziendale.
-*   `SMTP_PORT`: Porta del servizio SMTP (di solito `25` o `587` per connessioni standard/STARTTLS, `465` per SSL diretto).
-*   `SMTP_STARTTLS`: Se impostato a `True` o `Yes`, lo script esegue l'upgrade della connessione in TLS cifrato prima dell'autenticazione.
-*   `SMTP_USER` / `SMTP_PASSWORD`: Credenziali utilizzate per l'autenticazione SMTP. Se omesse o lasciate vuote, lo script tenterà un invio anonimo (open-relay autorizzato).
-*   `SMTP_FROM`: L'indirizzo mittente visibile nelle email inviate.
-*   `SMTP_TO`: La casella postale o la mailing-list degli amministratori di sistema incaricati di ricevere gli allarmi.
+### Configuration Parameters:
+*   `SMTP_SERVER`: Hostname or IP of the corporate SMTP server.
+*   `SMTP_PORT`: Port of the SMTP service (typically `25` or `587` for standard/STARTTLS connections, `465` for direct SSL).
+*   `SMTP_STARTTLS`: If set to `True` or `Yes`, the script upgrades the connection to encrypted TLS before authenticating.
+*   `SMTP_USER` / `SMTP_PASSWORD`: Credentials used for SMTP authentication. If omitted or left empty, the script will attempt anonymous sending (authorized open-relay).
+*   `SMTP_FROM`: The sender address visible in the sent emails.
+*   `SMTP_TO`: The mailbox or mailing list of the system administrators designated to receive the alerts.
 
 ---
 
-## 🛠️ Modalità di Utilizzo dello Script
+## 🛠️ Script Usage
 
-Lo script supporta due argomenti obbligatori passati da riga di comando:
-1.  `--subject`: L'oggetto dell'e-mail.
-2.  `--body`: Il corpo del testo dell'e-mail.
+The script supports two mandatory command-line arguments:
+1.  `--subject`: The email subject line.
+2.  `--body`: The email body text.
 
-### Esempio di Invocazione manuale:
+### Manual Invocation Example:
 ```bash
 python3 /usr/local/bin/kvirtio-mail-alerter.py \
-    --subject "Test Notifica KvirtIO" \
-    --body "Questo è un messaggio di test per convalidare la configurazione SMTP di KvirtIO."
+    --subject "KvirtIO Notification Test" \
+    --body "This is a test message to validate the KvirtIO SMTP configuration."
 ```
 
-### Invocazione Automatica dagli Script Watcher:
-Quando il caricatore di stato rileva un problema, richiama lo script in modalità asincrona:
+### Automatic Invocation by Watcher Scripts:
+When the state loader detects a problem, it calls the script asynchronously:
 ```bash
 python3 /usr/local/bin/kvirtio-mail-alerter.py \
     --subject "KvirtIO ALERT: Host node1 OVERLOADED [cluster_db]" \
-    --body "Il nodo node1 del cluster cluster_db e' in stato di sovraccarico da 3 controlli consecutivi." &
+    --body "Node node1 in cluster cluster_db is in an overloaded state for 3 consecutive checks." &
 ```
 
 ---
 
-## 🪵 Tracciamento Log (Syslog)
-Tutti gli esiti dell'invio e-mail vengono loggati tramite il demone syslog con il tag `KvirtIO-Mail`:
+## 🪵 Log Tracking (Syslog)
+All email sending results are logged via the syslog daemon with the tag `KvirtIO-Mail`:
 
-*   **Invio Riuscito (Info)**:
-    `SUCCESS: Email inviata a sysadmins@example.com - Oggetto: 'KvirtIO ALERT: Host node1 OVERLOADED [cluster_db]'`
-*   **Errore di Configurazione (Error)**:
-    `ERROR: SMTP_SERVER, SMTP_TO o SMTP_FROM mancanti nella configurazione.`
-*   **Errore di Rete/Autenticazione (Error)**:
-    `ERROR: Invio email a sysadmins@example.com fallito: [Errno 111] Connection refused`
+*   **Successful Send (Info)**:
+    `SUCCESS: Email sent to sysadmins@example.com - Subject: 'KvirtIO ALERT: Host node1 OVERLOADED [cluster_db]'`
+*   **Configuration Error (Error)**:
+    `ERROR: SMTP_SERVER, SMTP_TO, or SMTP_FROM missing in configuration.`
+*   **Network/Authentication Error (Error)**:
+    `ERROR: Sending email to sysadmins@example.com failed: [Errno 111] Connection refused`

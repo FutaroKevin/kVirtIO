@@ -1,34 +1,34 @@
-# Documentazione Servizio: KvirtIO I/O Watcher
+# Service Documentation: KvirtIO I/O Watcher
 
-Il servizio **KvirtIO I/O Watcher** monitora la latenza dei dischi multipath (`dm-*`) associati alle macchine virtuali con profilo "IOIntensive" presenti sui nodi di tutti i cluster definiti in `/etc/kvirtio`.
-
----
-
-## 📋 Descrizione Funzionale
-Il watcher scansiona ciclicamente tutti i file `.conf` all'interno della directory `/etc/kvirtio/clusters/` ad ogni esecuzione (ogni **1 minuto**). Per ciascun cluster caricato, esegue l'interrogazione tramite `iostat` per individuare colli di bottiglia e latenze anomale sui percorsi Fibre Channel di storage.
-
-### Flusso Logico di Controllo
-1.  Lo script viene eseguito ogni minuto.
-2.  Individua tutti i cluster configurati in `/etc/kvirtio/clusters/*.conf`.
-3.  Carica i parametri del singolo cluster (lista dei nodi e soglia di latenza specifica `LATENCY_THRESHOLD`).
-4.  Si collega via SSH a ciascun host.
-5.  Esegue `sudo iostat -dx 1 2` e analizza l'output del secondo report per i dispositivi `dm-*` (multipath).
-6.  Isola il valore massimo di latenza di risposta (`await`).
-7.  Se la latenza supera la soglia del cluster (es. `10.0` ms per `cluster_db`), invia un log di WARNING contenente il tag specifico del cluster.
+The **KvirtIO I/O Watcher** service monitors the latency of multipath disks (`dm-*`) associated with virtual machines with the "IOIntensive" profile on the nodes of all clusters defined in `/etc/kvirtio`.
 
 ---
 
-## 📉 Metodologia di Analisi dell'I/O (iostat & AWK)
-L'analisi viene effettuata catturando l'output di `iostat` eseguito sul nodo ipervisore ed elaborandolo localmente sul server di management tramite una pipeline AWK ad alta efficienza. Questo previene inutili sprechi di cicli CPU sugli host ipervisori di produzione e garantisce la corretta conversione dei separatori decimali (es. virgole europee `,` convertite in punti `.`).
+## 📋 Functional Description
+The watcher cyclically scans all `.conf` files inside the `/etc/kvirtio/clusters/` directory at each execution (every **1 minute**). For each loaded cluster, it queries the nodes using `iostat` to identify bottlenecks and abnormal latencies on the Fibre Channel storage paths.
+
+### Logic Control Flow
+1.  The script runs every minute.
+2.  It finds all configured clusters in `/etc/kvirtio/clusters/*.conf`.
+3.  It loads the parameters of the individual cluster (node list and specific latency threshold `LATENCY_THRESHOLD`).
+4.  It connects via SSH to each host.
+5.  It runs `sudo iostat -dx 1 2` and analyzes the output of the second report for `dm-*` (multipath) devices.
+6.  It isolates the maximum response latency value (`await`).
+7.  If the latency exceeds the cluster threshold (e.g., `10.0` ms for `cluster_db`), it writes a syslog `WARNING` log containing the specific cluster tag.
 
 ---
 
-## 🪵 Tracciamento Log (Syslog)
-I log inviati a syslog tramite `logger` includono il prefisso del cluster `[NOME_CLUSTER]` per permettere filtri selettivi:
+## 📈 I/O Analysis Methodology (iostat & AWK)
+The analysis is performed by capturing the output of `iostat` on the hypervisor node and processing it locally on the management server using a high-efficiency AWK pipeline. This prevents wasting CPU cycles on production KVM nodes and guarantees correct conversion of decimal separators (e.g., European commas `,` are converted to dots `.`).
 
-*   **Avvio monitoraggio (Info)**:
-    `INFO: Inizio monitoraggio I/O per il cluster: cluster_db (5 nodi).`
-*   **Superamento Soglia (Warning)**:
-    `WARNING: [cluster_db] Latenza I/O anomala sul nodo node2. Massimo await riscontrato su multipath: 14.52ms (Soglia: 10.0ms).`
-*   **Errore di Esecuzione (Error)**:
-    `ERROR: [cluster_db] Impossibile raccogliere metriche I/O da node5.`
+---
+
+## 🪵 Log Tracking (Syslog)
+Logs sent to syslog via `logger` include the cluster prefix `[CLUSTER_NAME]` to allow selective filtering:
+
+*   **Monitoring Started (Info)**:
+    `INFO: Starting I/O monitoring for cluster: cluster_db (5 nodes).`
+*   **Threshold Exceeded (Warning)**:
+    `WARNING: [cluster_db] Abnormal I/O latency on node node2. Max await found on multipath: 14.52ms (Threshold: 10.0ms).`
+*   **Execution Error (Error)**:
+    `ERROR: [cluster_db] Unable to collect I/O metrics from node5.`
