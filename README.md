@@ -13,6 +13,31 @@ This project is not intended to be associated to virtIO library
 
 ---
 
+## 🎯 When to use KvirtIO
+
+| Scenario | Fit |
+|---|---|
+| Enterprise VM Cluster | Excellent |
+| SAP / DB | Excellent |
+| Private Cloud | Moderate |
+| Kubernetes Platform | Not Primary Goal |
+| VDI | Moderate |
+| Edge | Good |
+
+---
+
+## 🧩 VM Hardware Profiles Matrix
+
+| Feature | Generic | App | Database |
+|---|---|---|---|
+| CPU | Auto | Auto | Static |
+| NUMA | Auto | Auto | Static |
+| HugePages | No | 2M | 1G |
+| Ballooning | Yes | Optional | No |
+| Migration | Full | Full | Conditional |
+
+---
+
 ## 📂 Repository Structure
 
 ### 1. Architecture and Design Documents

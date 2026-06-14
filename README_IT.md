@@ -14,6 +14,31 @@ Questo progetto non è in alcun modo legato alla libreria virtio.
 
 ---
 
+## 🎯 Quando usare KvirtIO
+
+| Scenario | Adeguatezza |
+|---|---|
+| Cluster VM Enterprise | Eccellente |
+| SAP / DB | Eccellente |
+| Private Cloud | Moderata |
+| Piattaforma Kubernetes | Non obiettivo primario |
+| VDI | Moderata |
+| Edge | Buona |
+
+---
+
+## 🧩 Matrice dei Profili Hardware VM
+
+| Caratteristica | Generic | App | Database |
+|---|---|---|---|
+| CPU | Auto | Auto | Static |
+| NUMA | Auto | Auto | Static |
+| HugePages | No | 2M | 1G |
+| Ballooning | Sì | Opzionale | No |
+| Migration | Full | Full | Condizionata |
+
+---
+
 ## 📂 Struttura del Repository
 
 ### 1. Documenti di Architettura e Design
