@@ -1,226 +1,231 @@
-# Guida al Deployment dei Watcher di Monitoraggio: KvirtIO
+# Monitoring Watchers Deployment Guide: KvirtIO
 
-Questo documento fornisce le istruzioni dettagliate per installare, configurare e verificare i watcher di monitoraggio del progetto **KvirtIO** con supporto multi-cluster nativo.
-
----
-
-## 🛠️ Architettura dei Watcher e Configurazione
-
-Il monitoraggio adotta un design completamente disaccoppiato basato su file di configurazione modulari:
-*   **Directory di configurazione**: `/etc/kvirtio/clusters/`
-*   **File di configurazione**: Ogni cluster è definito da un file `.conf` indipendente (es. `cluster_db.conf`, `cluster_web.conf`), permettendo di differenziare i nodi target, l'utente SSH e le soglie di allarme per ciascun cluster gestito.
-*   **Watcher (Server di Management)**: Eseguono la scansione dinamica della cartella di configurazione e iterano sui nodi di tutti i cluster rilevati.
+This document provides step-by-step instructions to install, configure, and verify the monitoring watchers of the **KvirtIO** project with native multi-cluster support.
 
 ---
 
-## 📋 Requisiti Preliminari
+## 🛠️ Watcher Architecture and Configuration
 
-1.  **Utente ed SSH (su tutti i nodi KVM e sul Server di Management)**:
-    *   Creare l'utente dedicato `kvirtwatch` su tutte le macchine (il server di management e gli host KVM di tutti i cluster):
+The monitoring system adopts a decoupled design based on modular configuration files:
+*   **Configuration directory**: `/etc/kvirtio/clusters/`
+*   **Configuration files**: Each cluster is defined by an independent `.conf` file (e.g., `cluster_db.conf`, `cluster_web.conf`), allowing for different target nodes, SSH users, and alarm thresholds per managed cluster.
+*   **Watchers (Management Server)**: These scripts dynamically scan the configuration folder and iterate over the nodes of all detected clusters.
+
+---
+
+## 📋 Prerequisites
+
+1.  **User and SSH setup (on all KVM nodes and the Management Server)**:
+    *   Create the dedicated `kvirtwatch` user on all machines (management server and KVM hosts of all clusters):
         ```bash
         sudo useradd -m -s /bin/bash kvirtwatch
         ```
-    *   Generare la chiave SSH dell'utente `kvirtwatch` sul server di management senza passphrase:
+    *   Generate the SSH key for the `kvirtwatch` user on the management server without a passphrase:
         ```bash
         sudo -u kvirtwatch ssh-keygen -t ed25519 -N "" -f /home/kvirtwatch/.ssh/id_ed25519
         ```
-    *   Distribuire la chiave pubblica su tutti i nodi ipervisori di tutti i cluster (es. per il cluster DB):
+    *   Distribute the public key to all hypervisor nodes of all clusters (e.g., for the DB cluster):
         ```bash
         sudo -u kvirtwatch ssh-copy-id -i /home/kvirtwatch/.ssh/id_ed25519.pub kvirtwatch@node1
-        # Ripetere per tutti i nodi definiti nei file di configurazione
+        # Repeat for all nodes defined in the configuration files
         ```
-    *   Verificare che la connessione avvenga senza richiesta di password:
+    *   Verify passwordless SSH connection:
         ```bash
         sudo -u kvirtwatch ssh -o StrictHostKeyChecking=accept-new kvirtwatch@node1 "hostname"
         ```
 
-2.  **Pacchetti sui nodi KVM (SLES)**:
-    *   Assicurarsi che il pacchetto `sysstat` sia installato su tutti gli host KVM:
+2.  **Required packages on KVM nodes (SLES)**:
+    *   Ensure that the `sysstat` package is installed on all KVM hosts:
         ```bash
         sudo zypper install sysstat
         ```
 
 ---
 
-## 🚀 Step 1: Configurazione dei Nodi KVM (Compute Host)
+## 🚀 Step 1: KVM Nodes Configuration (Compute Hosts)
 
-Su ciascun nodo ipervisore di tutti i cluster gestiti:
+On each hypervisor node of all managed clusters:
 
-1.  Creare il file di configurazione sudoers per permettere l'elevazione dei privilegi controllata dell'utente `kvirtwatch`:
-    *   Copiare il contenuto del file logico di configurazione [kvirtwatch (sudoers)](../sudoers/kvirtwatch) in `/etc/sudoers.d/kvirtwatch`.
-2.  Impostare i permessi di sicurezza corretti:
+1.  Create the sudoers configuration file to allow passwordless execution of required commands by the `kvirtwatch` user:
+    *   Copy the content of the logical configuration file [kvirtwatch (sudoers)](../sudoers/kvirtwatch) to `/etc/sudoers.d/kvirtwatch`.
+2.  Set the correct security permissions:
     ```bash
     sudo chmod 0440 /etc/sudoers.d/kvirtwatch
     sudo chown root:root /etc/sudoers.d/kvirtwatch
     ```
-3.  Verificare la validità della sintassi:
+3.  Verify the sudoers syntax:
     ```bash
     sudo visudo -c
     ```
 
 ---
 
-## 🚀 Step 2: Configurazione del Server di Management
+## 🚀 Step 2: Management Server Configuration
 
-Sul Server di Management esterno:
+On the external Management Server:
 
-1.  **Creazione della Struttura di Configurazione**:
+1.  **Create Directory Structure**:
     ```bash
     sudo mkdir -p /etc/kvirtio/clusters
+    sudo mkdir -p /var/lib/kvirtio/logs
+    sudo mkdir -p /var/lib/kvirtio/novnc/tokens
+    sudo mkdir -p /var/www/html/kvirtio/data
     ```
 
-2.  **Posizionamento dei file di configurazione**:
-    *   Creare i file di configurazione per ciascun cluster in `/etc/kvirtio/clusters/` prendendo spunto dai seguenti modelli:
-        *   [etc/kvirtio/clusters/cluster_db.conf](../etc/kvirtio/clusters/cluster_db.conf): Configurazione per il cluster database con soglie prestazionali restrittive.
-        *   [etc/kvirtio/clusters/cluster_web.conf](../etc/kvirtio/clusters/cluster_web.conf): Configurazione per il cluster generico/web.
-    *   Assegnare la proprietà all'utente di gestione:
+2.  **Place Configuration Files**:
+    *   Create configuration files for each cluster in `/etc/kvirtio/clusters/` using the following templates:
+        *   [etc/kvirtio/clusters/cluster_db.conf](../etc/kvirtio/clusters/cluster_db.conf): Database cluster configuration with strict thresholds.
+        *   [etc/kvirtio/clusters/cluster_web.conf](../etc/kvirtio/clusters/cluster_web.conf): Web/General-purpose cluster configuration.
+    *   Configure SMTP parameters in the global `/etc/kvirtio/mail.conf` file (refer to [kvirtio-mail-config.md](kvirtio-mail-config.md)).
+    *   Set permissions on the configuration directory:
         ```bash
         sudo chown -R kvirtwatch:kvirtwatch /etc/kvirtio
         sudo chmod 750 /etc/kvirtio
         sudo chmod 640 /etc/kvirtio/clusters/*.conf
+        sudo chmod 640 /etc/kvirtio/mail.conf
         ```
-
-3.  **Posizionamento degli script**:
-    *   Copiare gli script [kvirtio-*](../scripts/kvirtio-*) in `/usr/local/bin/kvirtio-*`.
-    *   Assegnare i permessi di esecuzione:
+    *   Assign appropriate permissions for the log and state directories to the web server group (`wwwrun` or `www-data` depending on the SLES version):
         ```bash
-        sudo cp script/kvirtio-* /usr/local/bin/
-        sudo chmod +x /usr/local/bin/kvirtio-*
-        sudo chown kvirtwatch:kvirtwatch /usr/local/bin/kvirtio-*
+        sudo chown -R kvirtwatch:wwwrun /var/lib/kvirtio
+        sudo chmod -R 770 /var/lib/kvirtio
         ```
 
-4.  **Configurazione dei Servizi Systemd**:
-    *   Copiare i file di servizio e timer da [systemd/](../systemd/) in `/etc/systemd/system/`:
+3.  **Deploy Watcher Scripts**:
+    *   Copy the scripts to `/usr/local/bin/`:
+        ```bash
+        sudo cp scripts/kvirtio-* /usr/local/bin/
+        sudo chmod 750 /usr/local/bin/kvirtio-*
+        sudo chown root:kvirtwatch /usr/local/bin/kvirtio-*
+        ```
+
+4.  **Configure Systemd Services**:
+    *   Copy service and timer files from [systemd/](../systemd/) to `/etc/systemd/system/`:
         ```bash
         sudo cp systemd/kvirtio-*.service /etc/systemd/system/
         sudo cp systemd/kvirtio-*.timer /etc/systemd/system/
         ```
-    *   Ricaricare il demone di Systemd:
+    *   Reload the systemd daemon:
         ```bash
         sudo systemctl daemon-reload
         ```
 
-5.  **Abilitazione e Avvio dei Timer**:
-    *   Abilitare e avviare i timer systemd per scheduler e watcher:
+5.  **Enable and Start Systemd Timers and Daemons**:
+    *   Enable and start systemd timers for periodic watchers:
         ```bash
-        sudo systemctl enable --now kvirtio-*.timer
+        sudo systemctl enable --now kvirtio-host-watcher.timer
+        sudo systemctl enable --now kvirtio-io-watcher.timer
+        sudo systemctl enable --now kvirtio-cluster-watcher.timer
+        sudo systemctl enable --now kvirtio-multipath-watcher.timer
+        sudo systemctl enable --now kvirtio-vm-watcher.timer
+        sudo systemctl enable --now kvirtio-html-generator.timer
         ```
-
-6.  **Abilitazione e Avvio dei Servizi**:
-    *   Abilitare e avviare i servizi systemd per scheduler e watcher:
+    *   Enable and start persistent background services (daemons):
         ```bash
-        sudo systemctl enable --now kvirtio-*.service
+        sudo systemctl enable --now kvirtio-console-tracker.service
+        sudo systemctl enable --now kvirtio-log-collector.service
         ```
 
 ---
 
-## 🔍 Step 3: Verifica e Monitoraggio
+## 🔍 Step 3: Verification and Monitoring
 
-### Stato dei Timer
-Verificare la corretta pianificazione e lo stato di attivazione dei timer di Systemd:
+### Timer and Service Status
+Verify that the systemd timers are active and correctly scheduled:
 ```bash
 systemctl list-timers --all | grep kvirtio
 ```
-
-### Esecuzione di Test Manuale
-È possibile forzare l'esecuzione dei servizi per convalidare il caricamento delle configurazioni ed escludere errori di sintassi:
+Verify the status of background services:
 ```bash
-sudo systemctl start kvirtio-*.service
-sudo systemctl start kvirtio-*.service
+systemctl status kvirtio-console-tracker.service
+systemctl status kvirtio-log-collector.service
 ```
 
-### Ispezione Log Multi-Cluster
-I log in syslog riporteranno l'indicazione esplicita del cluster in fase di elaborazione (es. `[cluster_db]`, `[cluster_web]`):
-*   Per visualizzare l'output del watcher host:
-    ```bash
-    journalctl -t KvirtIO-Host -f
-    ```
-*   Per visualizzare l'output del watcher I/O:
-    ```bash
-    journalctl -t KvirtIO-IO -f
-    ```
-*   Per filtrare gli eventi critici di un cluster specifico (es. `cluster_db`):
-    ```bash
-    journalctl -t KvirtIO-Host | grep '\[cluster_db\]'
-    ```
+### Manual Execution Test
+You can manually trigger the one-shot services to validate the configuration files and rule out syntax errors:
+```bash
+sudo systemctl start kvirtio-host-watcher.service
+sudo systemctl start kvirtio-io-watcher.service
+sudo systemctl start kvirtio-cluster-watcher.service
+sudo systemctl start kvirtio-multipath-watcher.service
+sudo systemctl start kvirtio-vm-watcher.service
+sudo systemctl start kvirtio-html-generator.service
+```
 
-## 📜 Step 4: Logging e Centralizzazione Log dei (KVM, Pacemaker, Audit)
-
-Gestione del logging verso il cluster di watcher. 
-
-Per rispettare la naming convention richiesta (`[servizio]-[cluster]-[nodo].log`), la configurazione sul server ricevente viene generata dinamicamente leggendo i file del progetto in `/etc/kvirtio/clusters/*.conf`, in modo da mappare correttamente ogni nodo al proprio cluster di appartenenza.
+### Log Inspection
+Logs in syslog will explicitly denote the cluster being processed (e.g., `[cluster_db]`, `[cluster_web]`):
+*   **Host Watcher**: `journalctl -t KvirtIO-Host -f`
+*   **I/O Watcher**: `journalctl -t KvirtIO-IO -f`
+*   **Cluster Watcher**: `journalctl -t KvirtIO-Cluster -f`
+*   **Multipath Watcher**: `journalctl -t KvirtIO-Multipath -f`
+*   **VM Watcher**: `journalctl -t KvirtIO-VM -f`
+*   **Log Collector**: `journalctl -t KvirtIO-LogCollector -f`
 
 ---
 
-### 1. Configurazione sui Nodi KVM (Client)
+## 📜 Step 4: Log Routing and Centralization (KVM, Pacemaker, Audit)
 
-Sui nodi computazionali, `rsyslog` viene istruito per inoltrare i flussi specifici al Virtual IP (o IP dedicato) del server Watcher, mentre `auditd` viene configurato per inviare i propri eventi a syslog.
+To comply with the requested naming convention (`[service]-[cluster]-[node].log`), the rsyslog configuration on the receiving server is generated dynamically by reading `/etc/kvirtio/clusters/*.conf`, correctly mapping each node to its respective cluster.
 
-#### 1.1 Forwarding Rsyslog (`/etc/rsyslog.d/10-kvirtio-forward.conf`)
-Creare il file su ogni nodo KVM per inoltrare i servizi target:
+### 1. Configuration on KVM Nodes (Clients)
 
+On the compute nodes, `rsyslog` is configured to forward specific logs to the virtual IP (or dedicated IP) of the Watcher server, while `auditd` is configured to send its events to syslog.
 
-#### 1.2 Inoltro log di Pacemaker / Cluster Manager
- ```bash
-if $programname == ['pacemakerd','crmd','pengine','corosync'] then @[IP_SERVER_WATCHER]:514
-t = string
- ```
+#### 1.1 Rsyslog Forwarding (`/etc/rsyslog.d/10-kvirtio-forward.conf`)
+Create this file on each KVM node to forward target logs to the Watcher server's IP (e.g., `10.10.10.100`):
 
-#### 1.3 Inoltro log di KVM / QEMU / Libvirt
- ```bash
-if $programname == ['libvirtd','qemu','qemu-kvm','qemu-system-x86_64'] then @[IP_SERVER_WATCHER]:514
-t = string
- ```
+```rsyslog
+# Forward Pacemaker / Corosync logs
+if $programname == ['pacemakerd','crmd','pengine','corosync'] then @10.10.10.100:514
 
-#### 1.4 Inoltro log di Auditd
- ```bash
-if $programname == ['audisp-syslog','auditd'] then @[IP_SERVER_WATCHER]:514
-t = string
+# Forward KVM / QEMU / Libvirt logs
+if $programname == ['libvirtd','qemu','qemu-kvm','qemu-system-x86_64'] then @10.10.10.100:514
+
+# Forward Auditd logs
+if $programname == ['audisp-syslog','auditd'] then @10.10.10.100:514
 ```
 
-#### 1.5  Configurazione di auditd sui nodi
-*   Modificare la configurazione del plugin di audit (il percorso standard per SLES è /etc/audisp/plugins.d/syslog.conf o /etc/audit/plugins.d/syslog.conf a seconda della release):
-    ```bash
-    active = yes
-    direction = out
-    path = /sbin/audisp-syslog
-    type = always
-    args = LOG_WARNING
-    format = string
-    ```
-
-#### 1.6 Restart dei servizi sui nodi
- ```bash
-systemctl restart auditd rsyslog
+#### 1.2 Auditd Plugin Configuration
+Edit `/etc/audit/plugins.d/syslog.conf` (or `/etc/audisp/plugins.d/syslog.conf` on older SLES releases):
+```ini
+active = yes
+direction = out
+path = /sbin/audisp-syslog
+type = always
+args = LOG_WARNING
+format = string
 ```
 
-
-### 2. Configurazione sul Cluster Watcher
-
-* Poiché rsyslog non è nativamente a conoscenza della variabile "Cluster" ma riceve solo l'hostname, utilizziamo uno script generatore che legge la topologia di kVirtIO (/etc/kvirtio/clusters/*.conf) e costruisce le regole di routing esatte per ogni nodo.
-
-### 2.1 Preparazione delle directory
-* per ogni nodo di Watcher generare i seguenti comandi:
+#### 1.3 Restart Services on Compute Nodes
 ```bash
-mkdir -p /var/log/kvirtio/
-chown syslog:kvirtwatch /var/log/kvirtio/
-chmod 755 /var/log/kvirtio/
+sudo systemctl restart auditd
+sudo systemctl restart rsyslog
 ```
 
-### 2.2 Script Generatore Configurazione Rsyslog
-* Creare lo script /usr/local/bin/kvirtio-rsyslog-generator.sh sul server Watcher. Questo script mapperà ogni nodo per salvare i log secondo il formato: /var/log/kvirtio/[servizio]-[cluster]-[nodo].log.
+---
 
-📜 **[kvirtio-setup-rsyslog-generator.sh](../scripts/kvirtio-rsyslog-generator.sh)**:
+### 2. Configuration on the Watcher Server
 
-### 2.3 Esecuzione e Riavvio
-* Rendere eseguibile lo script e generare la configurazione di rsyslog:
+Since rsyslog is not natively aware of the "Cluster" grouping, we use a helper script that reads the kVirtIO topology and compiles the exact routing rules for each node.
 
+#### 2.1 Directory Preparation
+On the Watcher server:
 ```bash
-chmod +x /usr/local/bin/kvirtio-setup-rsyslog-generator.sh
-/usr/local/bin/kvirtio-rsyslog-generator.sh
+sudo mkdir -p /var/log/kvirtio/
+sudo chown syslog:kvirtwatch /var/log/kvirtio/
+sudo chmod 755 /var/log/kvirtio/
 ```
-*Verificare che il file /etc/rsyslog.d/30-kvirtio-receiver.conf sia stato popolato correttamente e riavviare il demone sul Watcher:
+
+#### 2.2 Rsyslog Configuration Generation
+Run the generator script to map each node to its respective cluster:
 ```bash
-systemctl restart rsyslog
+sudo chmod +x /usr/local/bin/kvirtio-setup-rsyslog-generator.sh
+sudo /usr/local/bin/kvirtio-setup-rsyslog-generator.sh
 ```
-** (Nota Operativa: Ogni volta che un nuovo nodo o un nuovo cluster viene aggiunto in /etc/kvirtio/clusters/*.conf, basterà lanciare nuovamente /usr/local/bin/kvirtio-setup-rsyslog-generator.sh e ricaricare rsyslog).
+This generates `/etc/rsyslog.d/30-kvirtio-receiver.conf`, writing logs into `/var/log/kvirtio/[service]-[cluster]-[node].log`.
+
+#### 2.3 Restart Rsyslog
+```bash
+sudo systemctl restart rsyslog
+```
+
+*(Operational Note: Whenever a new node or cluster is added in `/etc/kvirtio/clusters/*.conf`, simply rerun the generator script and restart rsyslog).*
