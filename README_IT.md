@@ -6,6 +6,17 @@ Questo progetto non è in alcun modo legato alla libreria virtio.
 
 ---
 
+## ⚠️ Nota: Architettura di Riferimento
+
+**KvirtIO è esclusivamente un'architettura di riferimento (reference architecture)**, come già anticipato. Documenta un design validato e un insieme di convenzioni (storage, networking, HA, monitoraggio) che possono essere implementate con gli strumenti scelti da chi adotta il progetto.
+
+* Gli script di monitoraggio/watcher presenti in questo repository sono **implementazioni di riferimento**: mostrano *come* e *dove* recuperare i dati di telemetria e stato da ciascun componente (Libvirt, Pacemaker, multipath, ecc.). Chi adotta questa architettura può agganciare il proprio stack di monitoraggio (es. **Zabbix**, **Prometheus**, **Grafana**) alle stesse fonti dati, in alternativa agli script forniti.
+* Allo stesso modo, il provisioning non è legato a uno strumento specifico: le procedure e i template documentati (XML delle VM, file di configurazione) possono essere integrati nella propria automazione tramite **Ansible**, **Terraform** o qualsiasi altro strumento di IaC/orchestrazione, al posto degli script di esempio.
+* **In ambienti Service Provider / Enterprise** si raccomanda fortemente di integrare questa architettura con i propri strumenti di monitoraggio, automazione e orchestrazione già in uso, piuttosto che basarsi sugli script presenti in questo repository.
+* Gli script e i tool inclusi sono pensati per **ambienti di laboratorio, demo e Proof-of-Concept**, utili per validare l'architettura end-to-end prima di integrarla con strumenti di livello produttivo.
+
+---
+
 ## 🚀 Obiettivi del Progetto
 *   **Prestazioni deterministiche**: Esclusione totale dello swap host e ottimizzazione dell'allocazione di RAM (Hugepages) e CPU (pinning NUMA).
 *   **I/O ottimizzato per Database ("IOIntensive")**: Parallelizzazione delle code SCSI del kernel (`lun_queue_depth`) tramite strategie Multi-LUN Striped e architettura `blk-mq`.
