@@ -172,7 +172,7 @@ process_cluster() {
 
     log_info "[${CLUSTER_NAME}] Avvio ciclo watcher cluster."
 
-    local data_dir="/var/www/html/kvirtio/data"
+    local data_dir="/srv/www/htdocs/kvirtio/data"
     mkdir -p "${data_dir}" 2>/dev/null || true
     local state_file="${data_dir}/cluster_${CLUSTER_NAME}.json"
     local prev_state_file="/tmp/kvirtio_cluster_prev_state_${CLUSTER_NAME}"

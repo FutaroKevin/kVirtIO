@@ -18,7 +18,7 @@ Group=kvirtwatch
 
 # Hardening di sicurezza systemd
 ProtectSystem=strict
-ReadWritePaths=/var/lib/kvirtio/novnc/tokens /var/www/html/kvirtio/data
+ReadWritePaths=/var/lib/kvirtio/novnc/tokens /srv/www/htdocs/kvirtio/data
 PrivateTmp=true
 NoNewPrivileges=true
 
