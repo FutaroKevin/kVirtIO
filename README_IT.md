@@ -55,6 +55,8 @@ Questo progetto non è in alcun modo legato alla libreria virtio.
 ### 1. Documenti di Architettura e Design
 *   📄 **[KvirtIO High-Level Design (HLD)](KvirtIO_HLD_IT.md)**: Il documento di architettura di alto livello in italiano.
 *   🔒 **[KvirtIO Security Architecture & Hardening Design (HLD)](KvirtIO_Security_HLD.md)**: Baseline di sicurezza obbligatoria, modello Zero-Trust e riferimento di hardening per host, hypervisor, rete, storage e cluster.
+*   📊 **[Report Benchmark Storage (Baseline)](report-storage-it.md)**: Risultati dei test I/O sequenziali e random eseguiti su VM di test per validare lo stack KVM → Multipath → LVM Clustered → FC SAN.
+*   📊 **[Report Tuning Storage e Migrazione VM OLTP](report-ottimizzazione-multipath.md)**: Ottimizzazioni multipath e driver HBA su Dell PowerStore 1200T, benchmark post-tuning e validazione in produzione con VM PostgreSQL/Zabbix.
 
 ### 2. Monitoraggio, Watcher & Gestione (Control Plane Esterno)
 Questi script risiedono sul server di management esterno ed interrogano i nodi KVM tramite l'utente `kvirtwatch` via SSH.
