@@ -51,7 +51,7 @@ send_alert() {
     fi
 
     echo "${now}" > "${lock_file}"
-    python3 "${ALERTER}" --subject "${subject}" --body "${body}" &
+    #python3 "${ALERTER}" --subject "${subject}" --body "${body}" &
     log_info "Alert inviato: ${subject}"
 }
 
